@@ -10,28 +10,32 @@ This project is licensed under the terms of the GPLv3 License.
 Supported web sites
 -------------------
 ### Eventhalle Westpark, Ingolstadt
-[http://www.eventhalle-westpark.de/das-programm]
+Source: http://www.eventhalle-westpark.de/das-programm
 
 Script: `eventhalleWestpark2ics.pl`
-Demo: [http://www.geierb.de/~geierb/kalender/eventhallewestpark.ics]
+
+Demo: http://www.geierb.de/~geierb/kalender/eventhallewestpark.ics
 
 ### Kulturzentrum Halle Neun, Ingolstadt
-[http://halle9-ingolstadt.de]
+Source: http://halle9-ingolstadt.de
 
 Script: `halle92ics.pl`
-Demo: [http://www.geierb.de/~geierb/kalender/halle9.ics]
+
+Demo: http://www.geierb.de/~geierb/kalender/halle9.ics
 
 ### Intro.de
-[http://www.intro.de]
+Source: http://www.intro.de
 
 Script: `intro2ics.pl`
-Demo: [http://www.geierb.de/~geierb/kalender/intro.ics]
+
+Demo: http://www.geierb.de/~geierb/kalender/intro.ics
 
 ### Zündfunk Veranstaltungstipps
-[http://www.br.de/radio/bayern2/sendungen/zuendfunk/veranstaltungen-praesentationen/index.html]
+Source: http://www.br.de/radio/bayern2/sendungen/zuendfunk/veranstaltungen-praesentationen/index.html
 
 Script: `zuendfunk2ics.pl`
-Demo: [http://geierb.spdns.de/~geierb/kalender/zuendfunk-tipps.ics]
+
+Demo: http://geierb.spdns.de/~geierb/kalender/zuendfunk-tipps.ics
 
 Usage
 -----
