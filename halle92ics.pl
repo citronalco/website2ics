@@ -2,6 +2,8 @@
 # 2015 geierb@geierb.de
 # GPLv3
 
+# Todo: beginn, einlass, titel und kurzinfo von programmübersicht laden.
+
 use strict;
 use WWW::Mechanize;
 use HTML::Entities;
@@ -30,19 +32,18 @@ binmode STDOUT, ":utf8";	# Gegen "wide character"-Warnungen
 my $mech=WWW::Mechanize->new();
 $mech->get($url) or die($!);
 
-# alle links aus dem Kalender auslesen
-my @eventLinks=$mech->find_all_links(text=>'MEHR INFORMATIONEN');
 
 my @events;
-foreach my $eventLink (@eventLinks) {
-    my $event;
-    $mech->get($eventLink);
-    my $root=HTML::TreeBuilder->new_from_content($mech->content());
 
-    my $tree=$root->look_down('_tag'=>'div','id'=>'content');
+my $programmTree=HTML::TreeBuilder->new;
+$programmTree->ignore_unknown(0);
+$programmTree->parse($mech->content());
+foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
+    my $event;
 
     #### linke Spalte
-    my $h=$tree->look_down('_tag'=>'div',class=>'programmMeta') or die();
+    my $h=$articleTree->look_down('_tag'=>'div',class=>'programmMeta') or die($mech->uri()->as_string);
+#    my $h=$articleTree->look_down('_tag'=>'div',class=>'programmMeta') or next();
 
     # Datum
     ($event->{'datum'})=$h->as_trimmed_text()=~/^(\d{2}-\d{2}-\d{4})/;
@@ -68,6 +69,14 @@ foreach my $eventLink (@eventLinks) {
 	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$beginn);
 	}
     }
+
+    ##### link zu "Mehr Informationen" folgen
+    my $link=$articleTree->look_down('_tag'=>'a','class'=>'more')->attr('href');
+    $mech->get($link);
+#    $mech->get($articleTree->look_down('_tag'=>'a','class'=>'more')->attr('href'));
+    my $root=HTML::TreeBuilder->new_from_content($mech->content());
+
+    my $tree=$root->look_down('_tag'=>'div','id'=>'content');
 
     #### rechte Spalte
     $h=$root->look_down('class'=>'articleContent') or die();
