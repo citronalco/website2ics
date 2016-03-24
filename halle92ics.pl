@@ -43,10 +43,9 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 
     #### linke Spalte
     my $h=$articleTree->look_down('_tag'=>'div',class=>'programmMeta') or die($mech->uri()->as_string);
-#    my $h=$articleTree->look_down('_tag'=>'div',class=>'programmMeta') or next();
 
     # Datum
-    ($event->{'datum'})=$h->as_trimmed_text()=~/^(\d{2}-\d{2}-\d{4})/;
+    ($event->{'datum'})=$h->as_trimmed_text()=~/^(\d{2}[\-\.]\d{2}[\-\.]\d{4})/;
 
     # Einlass
     if (my ($einlass)=$h->as_trimmed_text()=~/Einlass (\d{2}:\d{2}) Uhr/) {
@@ -71,9 +70,9 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
     }
 
     ##### link zu "Mehr Informationen" folgen
-    my $link=$articleTree->look_down('_tag'=>'a','class'=>'more')->attr('href');
-    $mech->get($link);
-#    $mech->get($articleTree->look_down('_tag'=>'a','class'=>'more')->attr('href'));
+    my $moreLink=$articleTree->look_down('_tag'=>'a','class'=>'more')->attr('href');
+    $mech->get($moreLink);
+
     my $root=HTML::TreeBuilder->new_from_content($mech->content());
 
     my $tree=$root->look_down('_tag'=>'div','id'=>'content');
