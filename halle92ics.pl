@@ -83,8 +83,7 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
     $event->{'name'}=$h->look_down('_tag'=>'h2')->as_trimmed_text();
 
     # beschreibung
-    ($event->{'description'})=$h->as_trimmed_text();
-    $event->{'description'}=~s/^\s*$event->{'name'}\s*$//;	# todo: name ist immer noch in der beschtreibung!!! besser führendes <h2>..</h2> raus!
+    $event->{'description'}=join("\n",map { $_->as_trimmed_text(extra_chars=>'\xA0'); } $h->find('p'));
 
     # URL
     $event->{'url'}=		($mech->uri())->as_string;
