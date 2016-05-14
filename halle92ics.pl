@@ -91,13 +91,6 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
     # Ort
     $event->{'ort'}=		"Kulturzentrum neun, Elisabethstr. 9a, 85051 Ingolstadt";
 
-    # Prüfen ob alle nötig Infos da
-#    unless ($event->{'datum'} && $event->{'name'} && $event->{'description'} && $event->{'datum'}) {
-#	print STDERR Dumper $event;
-#	exit;
-#    }
-
-#    print STDERR Dumper $event;
     push(@events,$event);
 }
 
@@ -131,7 +124,7 @@ foreach my $event (@events) {
                     $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
 
 
-    $event->{'datum'}=~/(\d\d)\-(\d\d)\-(\d\d\d\d)/;
+    $event->{'datum'}=~/(\d\d)\D(\d\d)\D(\d\d\d\d)/;
 
     # wenn weder beginn noch einlass gegeben ist ganztages-event bauen
     my $startTime="$3$2$1";
