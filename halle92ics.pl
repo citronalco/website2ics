@@ -45,21 +45,36 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
     my $h=$articleTree->look_down('_tag'=>'div',class=>'programmMeta') or die($mech->uri()->as_string);
 
     # Datum
-    if ($h->as_trimmed_text()=~/^(\d{2}\D\d{2}\D\d{4})/) {
-	$event->{'startdatum'}=$1;
-	$event->{'startdatum'}=~s/\-/./g;
-	$event->{'startdatum'}=$datumFormat->parse_datetime($event->{'startdatum'}." 00:00");
+    if ($h->as_trimmed_text()=~/^(\d{2})\D(\d{2})\D(\d{2,4})/) {
+	if (length($3) eq 2) {
+	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".20".$3." 00:00");
+	}
+	else {
+	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".".$3." 00:00");
+	}
 	$event->{'enddatum'}=$event->{'startdatum'};
+#print "A: ".$event->{'startdatum'}."\n";
     }
-    elsif ($h->as_trimmed_text()=~/^(\d{2})\.?\-(\d{2})\.(\d{2})\.(\d{4})/) {
-	$event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$3.".".$4." 00:00");
+    elsif ($h->as_trimmed_text()=~/^(\d{2})\.?\-(\d{2})\.(\d{2})\.(\d{2,4})/) {
+	if (length($3) eq 2) {
+	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".20".$3." 00:00");
+	}
+	else {
+	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".".$3." 00:00");
+	}
 	$event->{'enddatum'}=$datumFormat->parse_datetime($2.".".$3.".".$4." 00:00");
+#print "B: ".$event->{'startdatum'}."\n";
     }
-    elsif ($h->as_trimmed_text()=~/^(\d{2})\.(\d{2})\.?\-(\d{2})\.(\d{2})\.(\d{4})/) {
-	$event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".".$5." 00:00");
+    elsif ($h->as_trimmed_text()=~/^(\d{2})\.(\d{2})\.?\-(\d{2})\.(\d{2})\.(\d{2,4})/) {
+	if (length($3) eq 2) {
+	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".20".$3." 00:00");
+	}
+	else {
+	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".".$3." 00:00");
+	}
 	$event->{'enddatum'}=$datumFormat->parse_datetime($3.".".$4.".".$5." 00:00");
+#print "C: ".$event->{'startdatum'}."\n";
     }
-
 
     # Einlasszeit
     if (my ($einlasszeit)=$h->as_trimmed_text()=~/Einlass (\d{2}:\d{2})/) {
