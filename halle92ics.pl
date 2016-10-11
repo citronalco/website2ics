@@ -44,37 +44,65 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
     #### linke Spalte
     my $h=$articleTree->look_down('_tag'=>'div',class=>'programmMeta') or die($mech->uri()->as_string);
 
-    # Datum
-    if ($h->as_trimmed_text()=~/^(\d{2})\D(\d{2})\D(\d{2,4})/) {
+
+    # DD-MM-DD-MM-YYYY
+    if ($h->as_trimmed_text()=~/^(\d{1,2})\D(\d{1,2})\D(\d{1,2})\D(\d{1,2})\D(\d{2,4})/) {
+	if (length($5) eq 2) {
+	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".20".$5." 00:00");
+	    $event->{'enddatum'}=$datumFormat->parse_datetime($3.".".$4.".".$5." 00:00");
+	}
+	else {
+	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".".$5." 00:00");
+	    $event->{'enddatum'}=$datumFormat->parse_datetime($3.".".$4.".".$5." 00:00");
+	}
+    print "A";
+    }
+
+    # DD/DD-MM-YYYY
+    elsif ($h->as_trimmed_text()=~/^(\d{1,2})\D{1,2}(\d{1,2})\D(\d{1,2})\D(\d{2,4})/) {
+	if (length($4) eq 2) {
+	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$3.".20".$4." 00:00");
+	    $event->{'enddatum'}=$datumFormat->parse_datetime($2.".".$3.".20".$4." 00:00");
+	}
+	else {
+	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$3.".".$4." 00:00");
+	    $event->{'enddatum'}=$datumFormat->parse_datetime($2.".".$3.".".$4." 00:00");
+	}
+    print "B";
+    }
+
+    # DD-MM-YYYY DD-MM-YYYY
+    elsif ($h->as_trimmed_text()=~/^(\d{1,2})\D(\d{1,2})\D(\d{2,4})\s+(\d{1,2})\D(\d{1,2})\D(\d{2,4})/) {
 	if (length($3) eq 2) {
 	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".20".$3." 00:00");
 	}
 	else {
 	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".".$3." 00:00");
 	}
-	$event->{'enddatum'}=$event->{'startdatum'};
-#print "A: ".$event->{'startdatum'}."\n";
+	if (length($6) eq 2) {
+	    $event->{'enddatum'}=$datumFormat->parse_datetime($4.".".$5.".20".$6." 00:00");
+	}
+	else {
+	    $event->{'enddatum'}=$datumFormat->parse_datetime($4.".".$5.".".$6." 00:00");
+	}
+    print "C";
     }
-    elsif ($h->as_trimmed_text()=~/^(\d{2})\.?\-(\d{2})\.(\d{2})\.(\d{2,4})/) {
+
+    # DD-MM-YYYY
+    elsif ($h->as_trimmed_text()=~/^(\d{1,2})\D(\d{1,2})\D(\d{2,4})/) {
 	if (length($3) eq 2) {
 	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".20".$3." 00:00");
 	}
 	else {
 	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".".$3." 00:00");
 	}
-	$event->{'enddatum'}=$datumFormat->parse_datetime($2.".".$3.".".$4." 00:00");
-#print "B: ".$event->{'startdatum'}."\n";
     }
-    elsif ($h->as_trimmed_text()=~/^(\d{2})\.(\d{2})\.?\-(\d{2})\.(\d{2})\.(\d{2,4})/) {
-	if (length($3) eq 2) {
-	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".20".$3." 00:00");
-	}
-	else {
-	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".".$3." 00:00");
-	}
-	$event->{'enddatum'}=$datumFormat->parse_datetime($3.".".$4.".".$5." 00:00");
-#print "C: ".$event->{'startdatum'}."\n";
+    else {
+	print STDERR Dumper $h->as_trimmed_text();
+	exit;
     }
+    unless ($event->{'enddatum'}) { $event->{'enddatum'}=$event->{'startdatum'}; }
+
 
     # Einlasszeit
     if (my ($einlasszeit)=$h->as_trimmed_text()=~/Einlass (\d{2}:\d{2})/) {
@@ -97,8 +125,6 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." ".$beginnzeit);
 	}
     }
-
-#    print Dumper  $event;exit;
 
     ##### link zu "Mehr Informationen" folgen
     my $moreLink=$articleTree->look_down('_tag'=>'a','class'=>'more')->attr('href');
