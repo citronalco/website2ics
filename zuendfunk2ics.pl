@@ -114,6 +114,7 @@ foreach my $e (@events) {
 #	duration=>'PT3H',
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
+        organizer=>"MAILTO:foobar",
 	location=>$e->{'ort'},
 	url=>$e->{'url'},
     );

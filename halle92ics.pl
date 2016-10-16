@@ -55,7 +55,6 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$2.".".$5." 00:00");
 	    $event->{'enddatum'}=$datumFormat->parse_datetime($3.".".$4.".".$5." 00:00");
 	}
-    print "A";
     }
 
     # DD/DD-MM-YYYY
@@ -68,7 +67,6 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 	    $event->{'startdatum'}=$datumFormat->parse_datetime($1.".".$3.".".$4." 00:00");
 	    $event->{'enddatum'}=$datumFormat->parse_datetime($2.".".$3.".".$4." 00:00");
 	}
-    print "B";
     }
 
     # DD-MM-YYYY DD-MM-YYYY
@@ -85,7 +83,6 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 	else {
 	    $event->{'enddatum'}=$datumFormat->parse_datetime($4.".".$5.".".$6." 00:00");
 	}
-    print "C";
     }
 
     # DD-MM-YYYY
@@ -105,7 +102,7 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 
 
     # Einlasszeit
-    if (my ($einlasszeit)=$h->as_trimmed_text()=~/Einlass (\d{2}:\d{2})/) {
+    if (my (undef,$einlasszeit)=$h->as_trimmed_text()=~/Einlass (ab )?(\d{2}:\d{2})/) {
 	if (($einlasszeit) and ($einlasszeit=~/24:00/)) {
 	    $event->{'einlass'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." 00:00");
 	    $event->{'einlass'}->add(days=>1);
@@ -113,10 +110,12 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 	else {
 	    $event->{'einlass'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." ".$einlasszeit);
 	}
+	$event->{'ende'}=$event->{'einlass'}->clone();
+	$event->{'ende'}->add(minutes=>$defaultDauer);
     }
 
     # Beginn
-    if (my ($beginnzeit)=$h->as_trimmed_text()=~/Beginn (\d{2}:\d{2})/) {
+    if (my (undef,$beginnzeit)=$h->as_trimmed_text()=~/Beginn (ab )?(\d{2}:\d{2})/) {
 	if (($beginnzeit) and ($beginnzeit=~/24:00/)) {
 	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." 00:00");
 	    $event->{'beginn'}->add(days=>1);
@@ -124,6 +123,14 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 	else {
 	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." ".$beginnzeit);
 	}
+	$event->{'ende'}=$event->{'beginn'}->clone();
+	$event->{'ende'}->add(minutes=>$defaultDauer);
+    }
+
+    unless ($event->{'beginn'} or $event->{'einlass'}) {
+	# keine startzeit
+	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." 00:00");
+	$event->{'ende'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." 23:59");
     }
 
     ##### link zu "Mehr Informationen" folgen
@@ -148,7 +155,6 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 
     # Ort
     $event->{'ort'}=		"Kulturzentrum neun, Elisabethstr. 9a, 85051 Ingolstadt";
-
 
 
     push(@events,$event);
@@ -195,8 +201,6 @@ foreach my $event (@events) {
 	    min=>$event->{'beginn'}->min,
 	    sec=>0
 	)->ical;
-	$event->{'ende'}=$event->{'beginn'}->clone();
-	$event->{'ende'}->add(minutes=>$defaultDauer);
     }
     elsif ($event->{'einlass'}) {
 	$startTime=Date::ICal->new(
@@ -207,13 +211,7 @@ foreach my $event (@events) {
 	    min=>$event->{'einlass'}->min,
 	    sec=>0
 	)->ical;
-	$event->{'ende'}=$event->{'einlass'}->clone();
-	$event->{'ende'}->add(minutes=>$defaultDauer);
     }
-    elsif ($event->{'startdatum'}) {
-	$startTime=sprintf("%.4d",$event->{'startdatum'}->year).sprintf("%.2d",$event->{'startdatum'}->month).sprintf("%.2d",$event->{'startdatum'}->day);
-    }
-
 
     # Einlass und Beginn zu Beschreibung dazu
     if ($event->{'beginn'}) {
@@ -222,7 +220,6 @@ foreach my $event (@events) {
     if ($event->{'einlass'}) {
 	$event->{'description'}="Einlass: ".sprintf("%.2d",$event->{'einlass'}->hour).":".sprintf("%.2d",$event->{'einlass'}->min)." Uhr ".$event->{'description'}." ";
     }
-
 
     if ($event->{'ende'}) {
 	$endTime=Date::ICal->new(
@@ -234,12 +231,6 @@ foreach my $event (@events) {
 	    sec=>0
 	)->ical;
     }
-    elsif ($event->{'enddatum'}) {
-	my $e=$event->{'enddatum'};
-	$e->add(days=>1);	# full day events: end date is day after event
-	$endTime=sprintf("%.4d",$e->year).sprintf("%.2d",$e->month).sprintf("%.2d",$e->day);
-    }
-
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
@@ -252,6 +243,7 @@ foreach my $event (@events) {
 #	duration=>"PT3H",
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
+        organizer=>"MAILTO:foobar",
 	location=>$event->{'ort'},
 	url=>$event->{'url'},
     );

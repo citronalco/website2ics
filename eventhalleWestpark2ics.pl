@@ -180,7 +180,8 @@ foreach my $event (@eventList) {
 	)->ical,
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
-	organizer=>$event->{'veranstalter'},
+#	organizer=>"CN=\"".$event->{'veranstalter'}."\"",
+	organizer=>"MAILTO:foobar",
 	location=>$event->{'ort'},
 	url=>$event->{'url'},
     );

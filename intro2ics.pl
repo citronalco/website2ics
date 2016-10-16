@@ -53,8 +53,8 @@ foreach my $city (@cities) {
 
 		$eventData->{'beginn'}=DateTime->new(year=>$1,month=>$2,day=>$3);
 
-		$eventData->{'ende'}=$eventData->{'beginn'}->clone();
-		$eventData->{'ende'}->add(days=>1);
+#		$eventData->{'ende'}=$eventData->{'beginn'}->clone();
+#		$eventData->{'ende'}->add(days=>1);
 
 		$eventData->{'name'}=$event->look_down('_tag'=>'p','class'=>'artist')->as_text;
 
@@ -117,13 +117,14 @@ foreach my $event (@events) {
 	uid=>$uid,
 	summary => $event->{'name'},
 	description => $event->{'description'},
-	dtstart=>sprintf("%04d%02d%02d",$event->{'beginn'}->year,$event->{'beginn'}->month,$event->{'beginn'}->day),
-	dtend=>sprintf("%04d%02d%02d",$event->{'ende'}->year,$event->{'ende'}->month,$event->{'ende'}->day),
+	dtstart=>sprintf("%04d%02d%02dT000000",$event->{'beginn'}->year,$event->{'beginn'}->month,$event->{'beginn'}->day),
+	dtend=>sprintf("%04d%02d%02dT235959",$event->{'beginn'}->year,$event->{'beginn'}->month,$event->{'beginn'}->day),
 #	all_day=>'1',
 #	duration=>"PT3H",
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
 #	organizer=>$event->{'veranstalter'},
+        organizer=>"MAILTO:foobar",
 	location=>$event->{'location'},
 #	url=>$event->{'url'},
     );
