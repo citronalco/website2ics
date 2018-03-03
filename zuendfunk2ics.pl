@@ -34,7 +34,7 @@ $mech->get($url) or die($!);
 $mech->follow_link(text=>'Alle Termine des Monats');
 
 my $tree=HTML::TreeBuilder->new_from_content($mech->content());
-my @eventTrees=$tree->look_down('_tag'=>'div','class'=>'calendar_content');
+my @eventTrees=$tree->look_down('_tag'=>'div','class'=>'detail_calendar_item');
 
 my @events;
 foreach my $event (@eventTrees) {
