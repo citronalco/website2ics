@@ -13,31 +13,29 @@ use Data::ICal::Entry::Event;
 use Date::ICal;
 use Time::HiRes;
 
-use Try::Tiny;
-
-use Data::Dumper;
-
 use utf8;
 use warnings;
 
 my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht im Programm, wird aber für Kalendereintrag gebraucht)
+
 my $url="http://www.br.de/radio/bayern2/sendungen/zuendfunk/veranstaltungen-praesentationen/index.html";
 
 # Gegen "wide character"-Warnungen
 binmode STDOUT, ":utf8";
 
-
 my $datumZeitFormat=DateTime::Format::Strptime->new('pattern'=>'%A, %d. %B %Y, %H:%M Uhr','time_zone'=>'Europe/Berlin','locale'=>'de_DE');
 
 my $mech=WWW::Mechanize->new();
 $mech->get($url) or die($!);
-$mech->follow_link(text=>'Alle Termine des Monats');
-
-my $tree=HTML::TreeBuilder->new_from_content($mech->content());
-my @eventTrees=$tree->look_down('_tag'=>'div','class'=>'detail_calendar_item');
 
 my @events;
-foreach my $event (@eventTrees) {
+foreach my $monthPage ($mech->find_all_links(text=>'Alle Termine des Monats')) {
+    $mech->get($monthPage);
+
+    my $tree=HTML::TreeBuilder->new_from_content($mech->content());
+    my @eventTrees=$tree->look_down('_tag'=>'div','class'=>'detail_calendar_item');
+
+    foreach my $event (@eventTrees) {
 	my $e;
 
 	# Kurztext
@@ -63,6 +61,7 @@ foreach my $event (@eventTrees) {
 	$e->{'name'}=($calendar_headlineTree->look_down('_tag'=>'span','class'=>'calendar_title'))->as_trimmed_text;
 
 	push(@events,$e);
+    }
 }
 
 # Create Datestamp for dtstamp
