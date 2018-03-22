@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# 2013 geierb@geierb.de
+# 2013,2018 geierb@geierb.de
 # GPLv3
 
 use strict;
@@ -8,9 +8,9 @@ use HTML::Entities;
 use HTML::TreeBuilder;
 
 use DateTime::Format::Strptime;
+use DateTime::Format::ICal;
 use Data::ICal;
 use Data::ICal::Entry::Event;
-use Date::ICal;
 use Time::HiRes;
 
 use utf8;
@@ -81,7 +81,7 @@ $calendar->add_properties(method=>"PUBLISH",
 	"X-WR-CALDESC"=>"Zündfunk Veranstaltungstipps");
 
 my $count=0;
-foreach my $e (@events) {
+foreach my $event (@events) {
     # Create uid
     my @tm=localtime();
     my $uid=sprintf("%d%02d%02d%02d%02d%02d%s%02d\@geierb.de",
@@ -92,30 +92,36 @@ foreach my $e (@events) {
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
-	summary => $e->{'name'},
-	description => $e->{'kurztext'},
-	dtstart=>Date::ICal->new(
-	    year=>$e->{'beginn'}->year,
-	    month=>$e->{'beginn'}->month,
-	    day=>$e->{'beginn'}->day,
-	    hour=>$e->{'beginn'}->hour,
-	    min=>$e->{'beginn'}->min,
-	    sec=>0
-	)->ical,
-	dtend=>Date::ICal->new(
-	    year=>$e->{'ende'}->year,
-	    month=>$e->{'ende'}->month,
-	    day=>$e->{'ende'}->day,
-	    hour=>$e->{'ende'}->hour,
-	    min=>$e->{'ende'}->min,
-	    sec=>0
-	)->ical,
+	summary => $event->{'name'},
+	description => $event->{'kurztext'},
+	dtstart => DateTime::Format::ICal->format_datetime(
+	    DateTime->new(
+		year=>$event->{'beginn'}->year,
+		month=>$event->{'beginn'}->month,
+		day=>$event->{'beginn'}->day,
+		hour=>$event->{'beginn'}->hour,
+		minute=>$event->{'beginn'}->min,
+		second=>0,
+		time_zone=>'Europe/Berlin'
+	    )
+	),
 #	duration=>'PT3H',
+	dtend => DateTime::Format::ICal->format_datetime(
+	    DateTime->new(
+		year=>$event->{'ende'}->year,
+		month=>$event->{'ende'}->month,
+		day=>$event->{'ende'}->day,
+		hour=>$event->{'ende'}->hour,
+		minute=>$event->{'ende'}->min,
+		second=>0,
+		time_zone=>'Europe/Berlin'
+	    )
+	),
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
         organizer=>"MAILTO:foobar",
-	location=>$e->{'ort'},
-	url=>$e->{'url'},
+	location=>$event->{'ort'},
+	url=>$event->{'url'},
     );
 
     $calendar->add_entry($eventEntry);
