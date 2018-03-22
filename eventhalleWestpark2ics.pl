@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# 2013 geierb@geierb.de
+# 2013,2018 geierb@geierb.de
 # GPLv3
 
 use strict;
@@ -8,15 +8,15 @@ use HTML::Entities;
 use HTML::TreeBuilder;
 
 use DateTime::Format::Strptime;
+use DateTime::Format::ICal;
 use Data::ICal;
 use Data::ICal::Entry::Event;
-use Date::ICal;
 use Time::HiRes;
 
 use Try::Tiny;
 
 use utf8;
-use Data::Dumper;
+#use Data::Dumper;
 use warnings;
 
 
@@ -161,23 +161,29 @@ foreach my $event (@eventList) {
 	categories=>$event->{'genre'},
 	summary => $event->{'name'},
 	description => $description,
-	dtstart=>Date::ICal->new(
-	    year=>$event->{'beginn'}->year,
-	    month=>$event->{'beginn'}->month,
-	    day=>$event->{'beginn'}->day,
-	    hour=>$event->{'beginn'}->hour,
-	    min=>$event->{'beginn'}->min,
-	    sec=>0
-	)->ical,
+	dtstart => DateTime::Format::ICal->format_datetime(
+	    DateTime->new(
+		year=>$event->{'beginn'}->year,
+		month=>$event->{'beginn'}->month,
+		day=>$event->{'beginn'}->day,
+		hour=>$event->{'beginn'}->hour,
+		minute=>$event->{'beginn'}->min,
+		second=>0,
+		time_zone=>'Europe/Berlin'
+	    )
+	),
 	#duration=>"PT3H",
-	dtend=>Date::ICal->new(
-	    year=>$event->{'ende'}->year,
-	    month=>$event->{'ende'}->month,
-	    day=>$event->{'ende'}->day,
-	    hour=>$event->{'ende'}->hour,
-	    min=>$event->{'ende'}->min,
-	    sec=>0
-	)->ical,
+	dtend => DateTime::Format::ICal->format_datetime(
+	    DateTime->new(
+		year=>$event->{'ende'}->year,
+		month=>$event->{'ende'}->month,
+		day=>$event->{'ende'}->day,
+		hour=>$event->{'ende'}->hour,
+		minute=>$event->{'ende'}->min,
+		second=>0,
+		time_zone=>'Europe/Berlin'
+	    )
+	),
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
 #	organizer=>"CN=\"".$event->{'veranstalter'}."\"",
