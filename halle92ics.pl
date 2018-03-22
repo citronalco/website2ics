@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# 2015 geierb@geierb.de
+# 2015,2018 geierb@geierb.de
 # GPLv3
 
 # Todo: beginn, einlass, titel und kurzinfo von programmübersicht laden.
@@ -10,15 +10,15 @@ use HTML::Entities;
 use HTML::TreeBuilder;
 
 use DateTime::Format::Strptime;
+use DateTime::Format::ICal;
 use Data::ICal;
 use Data::ICal::Entry::Event;
-use Date::ICal;
 use Time::HiRes;
 
 use Try::Tiny;
 
 use utf8;
-use Data::Dumper;
+#use Data::Dumper;
 use warnings;
 
 
@@ -193,24 +193,30 @@ foreach my $event (@events) {
     my ($startTime,$endTime);
 
     if ($event->{'beginn'}) {
-	$startTime=Date::ICal->new(
-	    year=>$event->{'beginn'}->year,
-	    month=>$event->{'beginn'}->month,
-	    day=>$event->{'beginn'}->day,
-	    hour=>$event->{'beginn'}->hour,
-	    min=>$event->{'beginn'}->min,
-	    sec=>0
-	)->ical;
+	$startTime=DateTime::Format::ICal->format_datetime(
+	    DateTime->new(
+		year=>$event->{'beginn'}->year,
+		month=>$event->{'beginn'}->month,
+		day=>$event->{'beginn'}->day,
+		hour=>$event->{'beginn'}->hour,
+		minute=>$event->{'beginn'}->min,
+		second=>0,
+		time_zone=>'Europe/Berlin'
+           )
+       );
     }
     elsif ($event->{'einlass'}) {
-	$startTime=Date::ICal->new(
-	    year=>$event->{'einlass'}->year,
-	    month=>$event->{'einlass'}->month,
-	    day=>$event->{'einlass'}->day,
-	    hour=>$event->{'einlass'}->hour,
-	    min=>$event->{'einlass'}->min,
-	    sec=>0
-	)->ical;
+	$startTime=DateTime::Format::ICal->format_datetime(
+	    DateTime->new(
+		year=>$event->{'einlass'}->year,
+		month=>$event->{'einlass'}->month,
+		day=>$event->{'einlass'}->day,
+		hour=>$event->{'einlass'}->hour,
+		minute=>$event->{'einlass'}->min,
+		second=>0,
+		time_zone=>'Europe/Berlin'
+           )
+       );
     }
 
     # Einlass und Beginn zu Beschreibung dazu
@@ -222,14 +228,17 @@ foreach my $event (@events) {
     }
 
     if ($event->{'ende'}) {
-	$endTime=Date::ICal->new(
-	    year=>$event->{'ende'}->year,
-	    month=>$event->{'ende'}->month,
-	    day=>$event->{'ende'}->day,
-	    hour=>$event->{'ende'}->hour,
-	    min=>$event->{'ende'}->min,
-	    sec=>0
-	)->ical;
+	$endTime=DateTime::Format::ICal->format_datetime(
+	    DateTime->new(
+		year=>$event->{'ende'}->year,
+		month=>$event->{'ende'}->month,
+		day=>$event->{'ende'}->day,
+		hour=>$event->{'ende'}->hour,
+		minute=>$event->{'ende'}->min,
+		second=>0,
+		time_zone=>'Europe/Berlin'
+           )
+       );
     }
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
