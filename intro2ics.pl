@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# 2014 geierb@geierb.de
+# 2014,2018 geierb@geierb.de
 # GPLv3
 
 use strict;
@@ -9,9 +9,9 @@ use HTML::Strip;
 use HTML::TreeBuilder;
 
 use DateTime::Format::Strptime;
+#use DateTime::Format::ICal;
 use Data::ICal;
 use Data::ICal::Entry::Event;
-use Date::ICal;
 use Time::HiRes;
 
 use Try::Tiny;
