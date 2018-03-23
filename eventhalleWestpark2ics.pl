@@ -169,7 +169,7 @@ foreach my $event (@eventList) {
 		hour=>$event->{'beginn'}->hour,
 		minute=>$event->{'beginn'}->min,
 		second=>0,
-		time_zone=>'Europe/Berlin'
+		#time_zone=>'Europe/Berlin'
 	    )
 	),
 	#duration=>"PT3H",
@@ -181,7 +181,7 @@ foreach my $event (@eventList) {
 		hour=>$event->{'ende'}->hour,
 		minute=>$event->{'ende'}->min,
 		second=>0,
-		time_zone=>'Europe/Berlin'
+		#time_zone=>'Europe/Berlin'
 	    )
 	),
 	dtstamp=>$dstamp,

@@ -201,7 +201,7 @@ foreach my $event (@events) {
 		hour=>$event->{'beginn'}->hour,
 		minute=>$event->{'beginn'}->min,
 		second=>0,
-		time_zone=>'Europe/Berlin'
+		#time_zone=>'Europe/Berlin'
            )
        );
     }
@@ -214,7 +214,7 @@ foreach my $event (@events) {
 		hour=>$event->{'einlass'}->hour,
 		minute=>$event->{'einlass'}->min,
 		second=>0,
-		time_zone=>'Europe/Berlin'
+		#time_zone=>'Europe/Berlin'
            )
        );
     }
@@ -236,7 +236,7 @@ foreach my $event (@events) {
 		hour=>$event->{'ende'}->hour,
 		minute=>$event->{'ende'}->min,
 		second=>0,
-		time_zone=>'Europe/Berlin'
+		#time_zone=>'Europe/Berlin'
            )
        );
     }
