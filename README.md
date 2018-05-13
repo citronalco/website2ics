@@ -35,7 +35,7 @@ Source: http://www.br.de/radio/bayern2/sendungen/zuendfunk/veranstaltungen-praes
 
 Script: `zuendfunk2ics.pl`
 
-Demo: https://geierb.de/~geierb/kalender/zuendfunk-tipps.ics
+Demo: https://www.geierb.de/~geierb/kalender/zuendfunk-tipps.ics
 
 
 ### KAP94, Ingolstadt
@@ -43,7 +43,7 @@ Source: http://www.kap94.de/events/month/
 
 Script: `kap942ics.pl`
 
-Demo: https://geierb.de/~geierb/kalender/kap94.ics
+Demo: https://www.geierb.de/~geierb/kalender/kap94.ics
 
 
 Usage
