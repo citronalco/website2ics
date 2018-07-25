@@ -51,7 +51,7 @@ for (my $month=0;$month<$MAXMONTHS;$month++) {
 	    );
 	}
         # fix location
-	$entry->add_properties('location'=>"KAP94, Westliche Ringstr. 91, 85049 Ingolstadt");
+	$entry->add_properties('location'=>"KAP94, Jahnstr. 1a, 85049 Ingolstadt");
 	$calendar->add_entry($entry);
     }
     $date->add(months=>1);
