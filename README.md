@@ -16,6 +16,7 @@ Script: `eventhalleWestpark2ics.pl`
 
 Demo: https://www.geierb.de/~geierb/kalender/eventhallewestpark.ics
 
+
 ### Kulturzentrum Halle Neun, Ingolstadt
 Source: http://halle9-ingolstadt.de
 
@@ -23,12 +24,6 @@ Script: `halle92ics.pl`
 
 Demo: https://www.geierb.de/~geierb/kalender/halle9.ics
 
-### Intro.de
-Source: http://www.intro.de
-
-Script: `intro2ics.pl`
-
-Demo: http://www.geierb.de/~geierb/kalender/intro.ics
 
 ### Zündfunk Veranstaltungstipps
 Source: http://www.br.de/radio/bayern2/sendungen/zuendfunk/veranstaltungen-praesentationen/index.html
