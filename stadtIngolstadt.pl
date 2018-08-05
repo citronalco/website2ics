@@ -156,7 +156,7 @@ foreach my $eventLink (keys (%links)) {
 	my @li=$eventDetails->look_down('_tag'=>'div','id'=>'event-additional')->look_down('_tag'=>'li');
 	push(@b,map { $_->as_trimmed_text() } @li);
     };
-    $event->{'description'}=join("\n",@b);
+    $event->{'description'}=join("\n\n",@b);
 
     # Kategorien
     try {
