@@ -32,6 +32,8 @@ Script: `zuendfunk2ics.pl`
 
 Demo: https://www.geierb.de/~geierb/kalender/zuendfunk-tipps.ics
 
+Source page still exists, but seems to be unmaintained.
+
 
 ### KAP94, Ingolstadt
 Source: http://www.kap94.de/events/month/
@@ -39,6 +41,14 @@ Source: http://www.kap94.de/events/month/
 Script: `kap942ics.pl`
 
 Demo: https://www.geierb.de/~geierb/kalender/kap94.ics
+
+
+### Stadt Ingolstadt
+Source: https://www.ingolstadt.de/Kultur/Veranstaltungen/Veranstaltungskalender/
+
+Script: `stadtIngolstadt.pl`
+
+Demo: https://www.geierb.de/~geierb/kalender/stadt-ingolstadt.ics
 
 
 Usage
