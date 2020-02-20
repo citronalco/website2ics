@@ -60,9 +60,4 @@ Example:
 $ perl website2ics.pl > calendarfile.ics
 ````
 
-The only script that supports **and requires** command line arguments is `intro2ics.pl`. You have to give at least one city name for which events should be fetched.
-Example:
-```bash
-$ perl intro2ics.pl hamburg berlin muenchen > calendarfile.ics
-````
 
