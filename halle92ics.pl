@@ -2,8 +2,6 @@
 # 2015,2018 geierb@geierb.de
 # GPLv3
 
-# Todo: beginn, einlass, titel und kurzinfo von programmübersicht laden.
-
 use strict;
 use WWW::Mechanize;
 use HTML::Entities;
@@ -43,7 +41,6 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 
     #### linke Spalte
     my $h=$articleTree->look_down('_tag'=>'div',class=>'programmMeta') or die($mech->uri()->as_string);
-
 
     # DD-MM-DD-MM-YYYY
     if ($h->as_trimmed_text()=~/^(\d{1,2})\D(\d{1,2})\D(\d{1,2})\D(\d{1,2})\D(\d{2,4})/) {
@@ -95,8 +92,9 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 	}
     }
     else {
-	print STDERR Dumper $h->as_trimmed_text();
-	exit;
+#	print STDERR Dumper $h->as_trimmed_text();
+#	exit;
+	next;
     }
     unless ($event->{'enddatum'}) { $event->{'enddatum'}=$event->{'startdatum'}; }
 
@@ -151,10 +149,10 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
     $event->{'description'}=join("\n",map { $_->as_trimmed_text(extra_chars=>'\xA0'); } $h->find('p'));
 
     # URL
-    $event->{'url'}=		($mech->uri())->as_string;
+    $event->{'url'}=($mech->uri())->as_string;
 
     # Ort
-    $event->{'ort'}=		"Kulturzentrum neun, Elisabethstr. 9a, 85051 Ingolstadt";
+    $event->{'ort'}="Kulturzentrum neun, Elisabethstr. 9a, 85051 Ingolstadt";
 
 
     push(@events,$event);
@@ -221,10 +219,10 @@ foreach my $event (@events) {
 
     # Einlass und Beginn zu Beschreibung dazu
     if ($event->{'beginn'}) {
-	$event->{'description'}="Beginn: ".sprintf("%.2d",$event->{'beginn'}->hour).":".sprintf("%.2d",$event->{'beginn'}->min)." Uhr ".$event->{'description'}." ";
+	$event->{'description'}="Beginn: ".sprintf("%.2d",$event->{'beginn'}->hour).":".sprintf("%.2d",$event->{'beginn'}->min)." Uhr\n".$event->{'description'}." ";
     }
     if ($event->{'einlass'}) {
-	$event->{'description'}="Einlass: ".sprintf("%.2d",$event->{'einlass'}->hour).":".sprintf("%.2d",$event->{'einlass'}->min)." Uhr ".$event->{'description'}." ";
+	$event->{'description'}="Einlass: ".sprintf("%.2d",$event->{'einlass'}->hour).":".sprintf("%.2d",$event->{'einlass'}->min)." Uhr\n".$event->{'description'}." ";
     }
 
     if ($event->{'ende'}) {
