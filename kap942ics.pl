@@ -15,6 +15,8 @@ use Data::ICal::Entry::Event;
 use utf8;
 use warnings;
 
+#use Data::Dumper;
+
 # KAP94 already provides basic information in ics format via a hidden link
 # This script filters out simple "belegt" events, sets location to the full address and adds the description
 
@@ -34,13 +36,23 @@ for (my $month=0;$month<$MAXMONTHS;$month++) {
     my $url="http://www.kap94.de/events/".$date->strftime("%Y-%m")."/?ical=1";
 
     $mech->get($url) or die($!);
+    #print $url."\n";
 
     my $kap94calendar=Data::ICal->new(data=>$mech->content());
     foreach my $entry (@{$kap94calendar->entries}) {
+
+	# skip entries without data
+	unless (($entry->property('summary')) and ($entry->property('url')) and ($entry->property('description'))) {
+	    #print Dumper $entry;
+	    #exit;
+	    next;
+	}
+
 	# skip simple "belegt" events
 	next if ($entry->property('summary')->[0]->value=~/^belegt$/);
 
 	my $url=$entry->property('url')->[0]->value;
+	
 	my $description=$entry->property('description')->[0]->value;
 	# if no description but event's url given, get description from url
 	if ((!$description) and ($url)) {
