@@ -28,7 +28,7 @@ my $mech=WWW::Mechanize->new();
 my $hs=HTML::Strip->new();
 
 
-my $url="http://www.ingolstadt.de/Kultur/Veranstaltungen/Veranstaltungskalender";
+my $url="https://www.ingolstadt.de/Kultur/Veranstaltungen/Veranstaltungskalender";
 
 my @eventList;
 my $currentPage=0;
@@ -169,7 +169,6 @@ foreach my $eventLink (keys (%links)) {
 	$event->{'link'}=
 	    $eventDetails->look_down('_tag'=>'div','id'=>'event-additional')->look_down('_tag'=>'a')->attr('href');
     };
-
     push(@eventList,$event);
 }
 
