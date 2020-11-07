@@ -77,7 +77,7 @@ foreach my $eventLink (@eventLinks) {
     try {
 	my $ticketPreis=($tree->look_down('_tag'=>'td',
 				    sub {
-					$_[0]->as_text=~/Ticket Preis:/
+					$_[0]->as_text=~/Ticketpreis:/
 				    }
 			    )->right)->as_trimmed_text;
 	($event->{'vorverkauf'})=$ticketPreis=~/^([\d\.\,]+ €)/;
@@ -104,12 +104,21 @@ foreach my $eventLink (@eventLinks) {
 	$event->{'description'}=($root->look_down('_tag'=>'div','id'=>'beschreibung'))->as_text;
     };
 
-    # Genre
+    # Stil
     $event->{'genre'}=($tree->look_down('_tag'=>'td',
 				    sub {
 					$_[0]->as_text=~/Stil:/
 				    }
 			    )->right)->as_trimmed_text;
+
+    # Sonstiges
+    try {
+	$event->{'sonstiges'}=($tree->look_down('_tag'=>'td',
+				    sub {
+					$_[0]->as_text=~/Sonstiges:/
+				    }
+			    )->right)->as_trimmed_text;
+    };
 
     # Veranstalter
     $event->{'veranstalter'}=($tree->look_down('_tag'=>'td',
@@ -154,6 +163,7 @@ foreach my $event (@eventList) {
     if ($event->{'vorverkauf'})	{ $description.="Vorverkauf: ".$event->{'vorverkauf'}." \n"; }
     if ($event->{'abendkasse'})	{ $description.="Abendkasse: ".$event->{'abendkasse'}." \n"; }
     $description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute);
+    if ($event->{'sonstiges'})	{ $description.="Sonstiges: ".$event->{'sonstiges'}." \n"; }
     $description.=" \n\n".$event->{'description'};
 
     my $eventEntry=Data::ICal::Entry::Event->new();
