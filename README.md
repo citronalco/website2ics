@@ -57,7 +57,7 @@ Each of the scripts fetches events from a different web site and outputs the ics
 
 Example:
 ```bash
-$ perl website2ics.pl > calendarfile.ics
+$ perl kap942ics.pl > calendarfile.ics
 ````
 
 
