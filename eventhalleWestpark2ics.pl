@@ -20,7 +20,7 @@ use utf8;
 use warnings;
 
 
-my $url="http://www.eventhalle-westpark.de/das-programm";
+my $url="https://www.eventhalle-westpark.de/das-programm";
 my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht im Programm, wird aber für Kalendereintrag gebraucht)
 
 my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%d.%m.%Y %H.%M','time_zone'=>'Europe/Berlin');
@@ -32,7 +32,7 @@ $mech->get($url) or die($!);
 
 my @eventList;
 # alle event-links auslesen..
-my @eventLinks=$mech->content()=~/class=\"thumbnail event event-clickable\" onclick=\"showModal\(\d+,\s*\'(http.+?)\'\);\"/g;
+my @eventLinks=$mech->content()=~/class=\"thumbnail event event-clickable\" onclick=\"showModal\(\d+,\s*\'(https:\/\/www\.eventhalle-westpark.de\/.+?\/.+?)\'\);\"/g;
 # ...und durchgehen
 foreach my $eventLink (@eventLinks) {
     my $event;
@@ -56,6 +56,7 @@ foreach my $eventLink (@eventLinks) {
 					$_[0]->as_text=~/Datum:/
 				    }
 			    )->right)->as_trimmed_text;
+
 
     # Einlass und Beginn stehen in einer Zeile
     my $einlassBeginn=($tree->look_down('_tag'=>'td',
