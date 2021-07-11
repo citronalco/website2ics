@@ -12,6 +12,8 @@ use DateTime;
 use Data::ICal;
 use Data::ICal::Entry::Event;
 
+use Try::Tiny;
+
 use utf8;
 use warnings;
 
@@ -56,11 +58,13 @@ for (my $month=0;$month<$MAXMONTHS;$month++) {
 	my $description=$entry->property('description')->[0]->value;
 	# if no description but event's url given, get description from url
 	if ((!$description) and ($url)) {
-	    $mech->get($url);
-	    my $tree=HTML::TreeBuilder->new_from_content($mech->content());
-	    $entry->add_properties(
-		'description'=>join("\n", map { $_->as_trimmed_text(extra_chars=>'\xA0'); } $tree->look_down('_tag'=>'div','id'=>'event-single-content')->find('p'))
-	    );
+	    try {
+		$mech->get($url);
+		my $tree=HTML::TreeBuilder->new_from_content($mech->content());
+		$entry->add_properties(
+		    'description'=>join("\n", map { $_->as_trimmed_text(extra_chars=>'\xA0'); } $tree->look_down('_tag'=>'div','id'=>'event-single-content')->find('p'))
+		);
+	    };
 	}
         # fix location
 	$entry->add_properties('location'=>"KAP94, Jahnstr. 1a, 85049 Ingolstadt");
