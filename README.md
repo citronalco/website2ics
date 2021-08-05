@@ -60,4 +60,6 @@ Example:
 $ perl kap942ics.pl > calendarfile.ics
 ````
 
-
+Additional Web sites
+===========
+**Freilichtkino im Turm Baur** uses Wordpress with the All-in-One Event Calendar plugin. Though they hide the plugin's ics export button, the function is still available. Simply use https://www.freilichtkino-turm-baur.de/?plugin=all-in-one-event-calendar&controller=ai1ec_exporter_controller&action=export_events&no_html=true for subscriptions.
