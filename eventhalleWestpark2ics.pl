@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# 2013,2018 geierb@geierb.de
+# 2013,2018,2022 geierb@geierb.de
 # GPLv3
 
 use strict;
@@ -32,7 +32,7 @@ $mech->get($url) or die($!);
 
 my @eventList;
 # alle event-links auslesen..
-my @eventLinks=$mech->content()=~/class=\"thumbnail event event-clickable\" onclick=\"showModal\(\d+,\s*\'(https:\/\/www\.eventhalle-westpark.de\/.+?\/.+?)\'\);\"/g;
+my @eventLinks=$mech->content()=~/class=\"thumbnail event event-clickable\" onclick=\"showModal\(\d+,\s*\'(https:\/\/www\.eventhalle-westpark.de\/.+?)\'\);\"/g;
 # ...und durchgehen
 foreach my $eventLink (@eventLinks) {
     my $event;
