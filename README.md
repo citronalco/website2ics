@@ -32,8 +32,6 @@ Script: `zuendfunk2ics.pl`
 
 Demo: https://www.geierb.de/~geierb/kalender/zuendfunk-tipps.ics
 
-Source page still exists, but seems to be unmaintained.
-
 
 ### KAP94, Ingolstadt
 Source: http://www.kap94.de/events/month/

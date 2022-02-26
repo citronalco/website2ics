@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# 2013,2018 geierb@geierb.de
+# 2013,2018,2022 geierb@geierb.de
 # GPLv3
 
 use strict;
@@ -16,6 +16,8 @@ use Time::HiRes;
 use utf8;
 use warnings;
 
+use Data::Dumper;
+
 my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht im Programm, wird aber für Kalendereintrag gebraucht)
 
 my $url="http://www.br.de/radio/bayern2/sendungen/zuendfunk/veranstaltungen-praesentationen/index.html";
@@ -29,39 +31,58 @@ my $mech=WWW::Mechanize->new();
 $mech->get($url) or die($!);
 
 my @events;
-foreach my $monthPage ($mech->find_all_links(text=>'Alle Termine des Monats')) {
-    $mech->get($monthPage);
+
+my @visitedPages;
+foreach my $eventPage ($mech->find_all_links(class_regex=>qr/link_article contenttype_calendar/))  {
+    next if (grep { $eventPage->url() eq $_ }  @visitedPages);
+    push(@visitedPages,$eventPage->url());
+
+    $mech->get($eventPage);
 
     my $tree=HTML::TreeBuilder->new_from_content($mech->content());
-    my @eventTrees=$tree->look_down('_tag'=>'div','class'=>'detail_calendar_item');
 
-    foreach my $event (@eventTrees) {
-	my $e;
+    my $e;
 
-	# Kurztext
-	$e->{'kurztext'}=($event->look_down('_tag'=>'p','class'=>'calendar_text'))->as_trimmed_text;
+    # Name
+    $e->{'name'}=$tree->look_down('_tag'=>'meta','name'=>'DCTERMS.title')->attr('content');
+    # Entferne "Zündfunk präsentiert" am Anfang
+    $e->{'name'}=~s/^Zündfunk präsentiert:?\s+//i;
 
-	# Beginn
-	my $datumZeit=($event->look_down('_tag'=>'p','class'=>'calendar_time'))->as_trimmed_text;
-	$e->{'beginn'}=$datumZeitFormat->parse_datetime($datumZeit);
-	$e->{'beginn'}=$datumZeitFormat->parse_datetime($datumZeit.", 20:00 Uhr") unless ($e->{'beginn'});	# wenn keine uhrzeit angegeben: 20:00 als start annehmen
+    # Beginn
+    my $datumZeit=($tree->look_down('_tag'=>'p','class'=>'calendar_time'))->as_trimmed_text;
+    $e->{'beginn'}=$datumZeitFormat->parse_datetime($datumZeit);
+    $e->{'beginn'}=$datumZeitFormat->parse_datetime($datumZeit.", 20:00 Uhr") unless ($e->{'beginn'});	# wenn keine uhrzeit angegeben: 20:00 als start annehmen
 
-	# Ende=Beginn+3h
-	$e->{'ende'}=$e->{'beginn'}->clone();
-	$e->{'ende'}->add(minutes=>$defaultDauer);
+    # Ende=Beginn+3h
+    $e->{'ende'}=$e->{'beginn'}->clone();
+    $e->{'ende'}->add(minutes=>$defaultDauer);
 
-	my $calendar_headlineTree=$event->look_down('class'=>'calendar_headline');
-	# Link
-	my ($link)=($mech->uri=~m[(^http://[^/]+)/]);
-	$link.=($calendar_headlineTree->look_down('_tag'=>'a'))->attr('href');
-	$e->{'url'}=$link;
-	# Ort
-	$e->{'ort'}=($calendar_headlineTree->look_down('_tag'=>'span','class'=>'calendar_overline'))->as_trimmed_text;
-	# Name
-	$e->{'name'}=($calendar_headlineTree->look_down('_tag'=>'span','class'=>'calendar_title'))->as_trimmed_text;
+    # Ort
+    $e->{'ort'}=($tree->look_down('_tag'=>'span','class'=>'calendar_title'))->as_trimmed_text;
+    # Entferne Doppelpunkt am Ende
+    $e->{'ort'}=~s/:$//;
 
-	push(@events,$e);
-    }
+    # Kurze Beschreibung
+    my $kurztext=$tree->look_down('_tag'=>'meta','name'=>'description')->attr('content');
+
+    # Lange Beschreibungen
+    my @langtexte=map{ $_->as_trimmed_text } $tree->look_down('_tag'=>'p','class'=>'copytext');
+    @langtexte=grep($_,@langtexte);
+
+    # Kalenderbeschreibungen
+    my @calendartexte=map{ $_->as_trimmed_text } $tree->look_down('_tag'=>'p','class'=>'calendar_text');
+    @calendartexte=grep($_,@calendartexte);
+
+    # Alle Beschreibungen zusammenfügen
+    $e->{'beschreibung'}=join(
+	    "\n\n",
+	    ($kurztext,join("\n\n",
+	(join("\n",@calendartexte),join("\n",@langtexte)))));
+
+    # Link
+    $e->{'url'}=$mech->uri()->as_string;
+
+    push(@events,$e);
 }
 
 # Create Datestamp for dtstamp
@@ -93,7 +114,7 @@ foreach my $event (@events) {
     $eventEntry->add_properties(
 	uid=>$uid,
 	summary => $event->{'name'},
-	description => $event->{'kurztext'},
+	description => $event->{'beschreibung'},
 	dtstart => DateTime::Format::ICal->format_datetime(
 	    DateTime->new(
 		year=>$event->{'beginn'}->year,
