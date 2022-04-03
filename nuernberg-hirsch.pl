@@ -164,8 +164,8 @@ my $dstamp = sprintf("%d%02d%02dT%02d%02d%02dZ",
 my $calendar=Data::ICal->new();
 $calendar->add_properties(method=>"PUBLISH",
         "X-PUBLISHED-TTL"=>"P1D",
-        "X-WR-CALNAME"=>"Muffatwerk",
-        "X-WR-CALDESC"=>"Veranstaltungen Muffatwerk");
+        "X-WR-CALNAME"=>"Hirsch",
+        "X-WR-CALDESC"=>"Veranstaltungen Hirsch");
 
 my $count=0;
 foreach my $event (@eventList) {
