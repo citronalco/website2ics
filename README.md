@@ -19,7 +19,7 @@ Um keine (oder weniger) Termine zu verpassen habe ich einige Skripte geschrieben
 | Nürnberg, Hirsch | https://www.der-hirsch.com/programm.html | `nuernberg-hirsch.pl` | https://www.geierb.de/~geierb/kalender/hirsch.ics |
 | Nürnberg, Z-Bau | https://z-bau.com/programm/ | `nuernberg-z-bau.pl` | https://www.geierb.de/~geierb/kalender/z-bau.ics |
 
-Die Demo-Kalender werden täglich aktualisiert.
+Die Demo-Kalender werden täglich aktualisiert und können abonniert werden.
 
 ## Verwendung
 Beispiel:
