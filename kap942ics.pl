@@ -33,7 +33,7 @@ binmode STDOUT, ":utf8";
 my $mech=WWW::Mechanize->new();
 my $date=DateTime->now;
 
-my $MAXMONTHS=6;
+my $MAXMONTHS=12;
 for (my $month=0;$month<$MAXMONTHS;$month++) {
     my $url="http://www.kap94.de/events/".$date->strftime("%Y-%m")."/?ical=1";
 

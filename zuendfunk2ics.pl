@@ -148,5 +148,6 @@ foreach my $event (@events) {
     $calendar->add_entry($eventEntry);
     $count++;
 }
+die("Keine Einträge") if ($count==0);
 
 print $calendar->as_string;
