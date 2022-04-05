@@ -14,6 +14,7 @@ Um keine (oder weniger) Termine zu verpassen habe ich einige Skripte geschrieben
 | Ingolstadt, KAP94 | https://kap94.de/events/ | `ingolstadt-kap94.pl` | https://www.geierb.de/~geierb/kalender/kap94.ics |
 | Ingolstadt (Stadt) | https://www.ingolstadt.de/Kultur/Veranstaltungen/Veranstaltungskalender | `ingolstadt-stadtIngolstadt.pl` | https://www.geierb.de/~geierb/kalender/stadt-ingolstadt.ics |
 | München, Backstage | https://backstage.eu/veranstaltungen.html | `muenchen-backstage.pl` | https://www.geierb.de/~geierb/kalender/backstage.ics |
+| München, Milla | https://www.milla-club.de/category/event/ | `muenchen-milla.pl` | https://www.geierb.de/~geierb/kalender/milla.ics |
 | München, Muffatwerk (mit Club Ampere) | https://www.muffatwerk.de/de/events | `muenchen-muffatwerk.pl` | https://www.geierb.de/~geierb/kalender/muffatwerk.ics |
 | München, Strom | https://strom-muc.de/ | `muenchen-strom.pl`  | https://www.geierb.de/~geierb/kalender/strom.ics |
 | Nürnberg, Hirsch | https://www.der-hirsch.com/programm.html | `nuernberg-hirsch.pl` | https://www.geierb.de/~geierb/kalender/hirsch.ics |
