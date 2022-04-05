@@ -126,12 +126,12 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
     }
 
     unless ($event->{'beginn'} or $event->{'einlass'}) {
-	# keine startzeit
+	# keine Startzeit
 	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." 00:00");
 	$event->{'ende'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." 23:59");
     }
 
-    ##### link zu "Mehr Informationen" folgen
+    ##### Link zu "Mehr Informationen" folgen
     my $moreLink=$articleTree->look_down('_tag'=>'a','class'=>'more')->attr('href');
     $mech->get($moreLink);
 
@@ -145,7 +145,7 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
     # Name
     $event->{'name'}=$h->look_down('_tag'=>'h2')->as_trimmed_text();
 
-    # beschreibung
+    # Beschreibung
     $event->{'description'}=join("\n",map { $_->as_trimmed_text(extra_chars=>'\xA0'); } $h->find('p'));
 
     # URL
@@ -183,7 +183,6 @@ foreach my $event (@events) {
                     $tm[5] + 1900, $tm[4] + 1, $tm[3], $tm[2],
                     $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
 
-
 #    $event->{'datum'}=~/(\d\d)\D(\d\d)\D(\d\d\d\d)/ or next;	# TODO: Mehrtägige Events! Auch oben berücksichtigen!! (17.-19.03.2016 oder 30.06.-02.07.2016)
     # wenn weder beginn noch einlass gegeben ist ganztages-event bauen
 #    my $startTime="$3$2$1";
@@ -217,14 +216,6 @@ foreach my $event (@events) {
        );
     }
 
-    # Einlass und Beginn zu Beschreibung dazu
-    if ($event->{'beginn'}) {
-	$event->{'description'}="Beginn: ".sprintf("%.2d",$event->{'beginn'}->hour).":".sprintf("%.2d",$event->{'beginn'}->min)." Uhr\n".$event->{'description'}." ";
-    }
-    if ($event->{'einlass'}) {
-	$event->{'description'}="Einlass: ".sprintf("%.2d",$event->{'einlass'}->hour).":".sprintf("%.2d",$event->{'einlass'}->min)." Uhr\n".$event->{'description'}." ";
-    }
-
     if ($event->{'ende'}) {
 	$endTime=DateTime::Format::ICal->format_datetime(
 	    DateTime->new(
@@ -238,6 +229,12 @@ foreach my $event (@events) {
            )
        );
     }
+
+    # Einlass zu Beschreibung dazu
+    if ($event->{'einlass'}) {
+	$event->{'description'}="Einlass: ".sprintf("%.2d",$event->{'einlass'}->hour).":".sprintf("%.2d",$event->{'einlass'}->min)." Uhr \n\n".$event->{'description'}." ";
+    }
+
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,

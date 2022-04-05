@@ -54,16 +54,25 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/${url}event\//)) {
     my $ok=eval { $mech->get($eventLink); }; # sometimes some links are broken
     next unless ($ok);
 
+    # Tickets
+    try {
+	$event->{'tickets'}=$mech->find_link('text'=>'Tickets kaufen')->url_abs()->as_string();
+    };
+
     my $root=HTML::TreeBuilder->new_from_content($mech->content());
 
-    # Name
-    $event->{'name'}=$root->look_down('_tag'=>'h1','class'=>'gdlr-event-title')->as_trimmed_text;
-    $event->{'name'}=~s/([\w'’]+)/\u\L$1/g;
+    # Titel
+    $event->{'titel'}=$root->look_down('_tag'=>'h1','class'=>'gdlr-event-title')->as_trimmed_text;
+    $event->{'titel'}=~s/([\w'’]+)/\u\L$1/g;
+
+    # Kategorie
+    $event->{'kategorie'}=$root->look_down('_tag'=>'div','class'=>'gdlr-event-location')->as_trimmed_text;
+    $event->{'kategorie'}=~s/([\w'’]+)/\u\L$1/g;
 
     # Beschreibung
     try {
-	$event->{'description'}=$root->look_down('_tag'=>'div','class'=>'gdlr-event-content')->as_text;
-	$event->{'description'}=~s/Der Inhalt ist nicht verfügbar.*?Bitte erlaube Cookies, indem du auf Übernehmen im Banner klickst.//;
+	$event->{'beschreibung'}=$root->look_down('_tag'=>'div','class'=>'gdlr-event-content')->as_text;
+	$event->{'beschreibung'}=~s/Der Inhalt ist nicht verfügbar.*?Bitte erlaube Cookies, indem du auf Übernehmen im Banner klickst.//;
     };
 
     my $infoWrapper=$root->look_down('_tag'=>'div','class'=>'gdlr-event-info-wrapper');
@@ -171,19 +180,22 @@ foreach my $event (@eventList) {
 
     my $description;
     if ($event->{'preis'})	{ $description.=$event->{'preis'}." \n"; }
+    if ($event->{'tickets'})	{ $description.="Tickets: ".$event->{'tickets'}." \n"; }
     if ($event->{'einlass'}) {
 	$description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute)." \n";
     }
+    $description.=" \n".$event->{'beschreibung'}."\n";
+
     if ($event->{'veranstalter'}) {
-	$description.="Veranstalter: ".$event->{'veranstalter'}." \n";
+	$description.=" \n Veranstalter: ".$event->{'veranstalter'}." \n";
     }
-    $description.=" \n".$event->{'description'};
 
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
-	summary => $event->{'name'},
+	summary => $event->{'titel'},
 	description => $description,
+	categories => $event->{'kategorie'},
 	dtstart => DateTime::Format::ICal->format_datetime(
 	    DateTime->new(
 		year=>$event->{'beginn'}->year,

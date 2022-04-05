@@ -43,10 +43,10 @@ foreach my $eventPage ($mech->find_all_links(class_regex=>qr/link_article conten
 
     my $e;
 
-    # Name
-    $e->{'name'}=$tree->look_down('_tag'=>'meta','name'=>'DCTERMS.title')->attr('content');
+    # Titel
+    $e->{'titel'}=$tree->look_down('_tag'=>'meta','name'=>'DCTERMS.title')->attr('content');
     # Entferne "Zündfunk präsentiert" am Anfang
-    $e->{'name'}=~s/^Zündfunk präsentiert:?\s+//i;
+    $e->{'titel'}=~s/^Zündfunk präsentiert:?\s+//i;
 
     # Beginn
     my $datumZeit=($tree->look_down('_tag'=>'p','class'=>'calendar_time'))->as_trimmed_text;
@@ -113,7 +113,7 @@ foreach my $event (@events) {
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
-	summary => $event->{'name'},
+	summary => $event->{'titel'},
 	description => $event->{'beschreibung'},
 	dtstart => DateTime::Format::ICal->format_datetime(
 	    DateTime->new(

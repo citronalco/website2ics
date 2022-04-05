@@ -77,16 +77,16 @@ foreach my $article ($programm->look_down('_tag'=>'article','class'=>qr/event/))
 
     try {
 	# Abgesagte Events sind zwar im Programm, aber mit anderen Klassen. Müssen nicht extra rausgefiltert werden.
-	$event->{'name'}=$article->look_down('_tag'=>'div','class'=>'event__title')->look_down('class'=>'event__main-title')->as_trimmed_text;
+	$event->{'titel'}=$article->look_down('_tag'=>'div','class'=>'event__title')->look_down('class'=>'event__main-title')->as_trimmed_text;
     };
-    next unless ($event->{'name'});
+    next unless ($event->{'titel'});
 
-    $event->{'name2'}=$article->look_down('_tag'=>'div','class'=>'event__title')->look_down('class'=>'event__sub-title')->as_trimmed_text;
+    $event->{'untertitel'}=$article->look_down('_tag'=>'div','class'=>'event__title')->look_down('class'=>'event__sub-title')->as_trimmed_text;
     $event->{'ort'}=$article->look_down('_tag'=>'div','class'=>'event__location')->as_trimmed_text;
     try {
 	$event->{'tickets'}=$article->look_down('_tag'=>'div','class'=>'event__tickets')->look_down('_tag'=>'a','class'=>'event__ticket-link')->attr('href');
     };
-    $event->{'description'}=$article->look_down('_tag'=>'div','class'=>'event__info-text')->as_trimmed_text;
+    $event->{'beschreibung'}=$article->look_down('_tag'=>'div','class'=>'event__info-text')->as_trimmed_text;
     $event->{'eintritt'}=$article->look_down('_tag'=>'div','class'=>'event__eintritt')->as_trimmed_text;
 
     push(@eventList,$event);
@@ -118,28 +118,17 @@ foreach my $event (@eventList) {
                     $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
 
     ## Beschreibung bauen
-    my @descTop;
-    push(@descTop,$event->{'name2'}) if ($event->{'name2'});
-
-    # Einlass und Beginn zu Beschreibung dazu
-    push(@descTop,"Beginn: ".sprintf("%.2d",$event->{'beginn'}->hour).":".sprintf("%.2d",$event->{'beginn'}->min)." Uhr") if ($event->{'beginn'});
-    push(@descTop,"Einlass: ".sprintf("%.2d",$event->{'einlass'}->hour).":".sprintf("%.2d",$event->{'einlass'}->min)." Uhr") if ($event->{'einlass'});
-
-    my $description=join(" \n",@descTop);
-    $description.=" \n" if (length($description)>0);
-
-    # Event-Beschreibung
-    $description.=$event->{'description'};
-
-    # Ticket-Link
-    if ($event->{'tickets'}) {
-	$description.=" \n ".$event->{'tickets'}." \n";
-    }
+    my $description;
+    $description.=$event->{'untertitel'}." \n\n" if ($event->{'untertitel'});
+    $description.=$event->{'eintritt'}." \n" if ($event->{'eintritt'});
+    $description.="Vorverkauf: ".$event->{'tickets'}." \n" if ($event->{'tickets'});
+    $description.="Einlass: ".sprintf("%.2d",$event->{'einlass'}->hour).":".sprintf("%.2d",$event->{'einlass'}->min)." Uhr \n" if ($event->{'einlass'});
+    $description.="\n ".$event->{'beschreibung'}." \n";
 
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
-	summary => $event->{'name'},
+	summary => $event->{'titel'},
 	description => $description,
 	categories => $event->{'category'},
 	dtstart => DateTime::Format::ICal->format_datetime(

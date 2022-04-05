@@ -159,12 +159,11 @@ foreach my $event (@eventList) {
                     $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
 
     my $description;
-    $description.="Genre: ".$event->{'genre'}." \n";
     if ($event->{'vorverkauf'})	{ $description.="Vorverkauf: ".$event->{'vorverkauf'}." \n"; }
     if ($event->{'abendkasse'})	{ $description.="Abendkasse: ".$event->{'abendkasse'}." \n"; }
-    $description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute);
+    $description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute)." \n";
     if ($event->{'sonstiges'})	{ $description.="Sonstiges: ".$event->{'sonstiges'}." \n"; }
-    $description.=" \n\n".$event->{'description'};
+    $description.=" \n".$event->{'description'};
 
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(

@@ -61,7 +61,7 @@ foreach my $eventLink ($mech->find_all_links('url_regex'=>qr/^https:\/\/www.der-
 		->look_down('_tag'=>'div','class'=>'event block');
 
     # Beschreibung
-    $event->{'description'}=$bRechts->look_down('_tag'=>'div','class'=>'ce_text block')->as_trimmed_text();
+    $event->{'beschreibung'}=$bRechts->look_down('_tag'=>'div','class'=>'ce_text block')->as_trimmed_text();
 
     # Titel
     $event->{'titel'}=$bRechts->look_down('_tag'=>'h1')->as_trimmed_text();
@@ -77,6 +77,7 @@ foreach my $eventLink ($mech->find_all_links('url_regex'=>qr/^https:\/\/www.der-
 	# "Support" zu Titel hinzufügen
 	$event->{'titel'}.=" - ".$bRechts->look_down('_tag'=>'p','class'=>'eventSupport')->as_trimmed_text();
     };
+    $event->{'titel'}=~s/([\w'’]+)/\u\L$1/g;
 
 
     ### Info-Block links: Datum, Einlass, Beginn, Ort, Preis, Ticket-Link, Veranstalter
@@ -130,24 +131,6 @@ foreach my $eventLink ($mech->find_all_links('url_regex'=>qr/^https:\/\/www.der-
 	$event->{'tickets'}=$mech->find_link(text=>'TICKETS')->url_abs()->as_string;
     };
 
-    ### Beschreibung zusammenbauen
-    my @descTop;
-    push(@descTop, $event->{'alert'}) if ($event->{'alert'});
-    if (scalar(@descTop)>0) {
-	$event->{'description'}=join(" \n",@descTop)." \n\n".$event->{'description'};
-    }
-
-    my @descBottom=(
-	"Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute),
-	$event->{'preis'}
-    );
-    push(@descBottom, "Tickets: ".$event->{'tickets'}) if ($event->{'tickets'});
-    push(@descBottom, "Veranstalter: ".$event->{'veranstalter'});
-
-    if (scalar(@descBottom)>0) {
-	$event->{'description'}.=" \n\n".join(" \n",@descBottom);
-    }
-
     push(@eventList,$event);
 }
 
@@ -175,6 +158,15 @@ foreach my $event (@eventList) {
                     $tm[5] + 1900, $tm[4] + 1, $tm[3], $tm[2],
                     $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
 
+    ### Beschreibung zusammenbauen
+    my $description;
+    $description.=$event->{'alert'}." \n\n" if ($event->{'alert'});
+    $description.=$event->{'preis'}." \n";
+    $description.="Tickets: ".$event->{'tickets'}." \n" if ($event->{'tickets'});
+    $description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute). " \n";
+    $description.=" \n".$event->{'beschreibung'}." \n\n";
+    $description.= "Veranstalter: ".$event->{'veranstalter'};
+
     # Ende festlegen
     $event->{'ende'}=$event->{'beginn'}->clone();
     $event->{'ende'}->add(minutes=>$defaultDauer);
@@ -183,8 +175,7 @@ foreach my $event (@eventList) {
     $eventEntry->add_properties(
 	uid=>$uid,
 	summary => $event->{'titel'},
-	description => $event->{'description'},
-	categories => $event->{'category'},
+	description => $description,
 	dtstart => DateTime::Format::ICal->format_datetime(
 	    DateTime->new(
 		year=>$event->{'beginn'}->year,

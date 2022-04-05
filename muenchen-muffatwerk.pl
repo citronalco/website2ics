@@ -59,9 +59,11 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 
     # Datum
     my $datum=$root->look_down('_tag'=>'div','class'=>'entry-data side left')->as_trimmed_text;
+    # "Heute"
     if (lc($datum)=~/heute/) {
 	$event->{'datum'}=strftime "%d.%m.%Y", localtime();
     }
+    # "Morgen"
     elsif (lc($datum)=~/morgen/) {
 	$event->{'datum'}=strftime "%d.%m.%Y", localtime(time()+24*60*60);
     }
@@ -79,16 +81,16 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     }
 
     # Kategorie
-    $event->{'category'}=$root->look_down('_tag'=>'div','class'=>'entry-data side right')->as_trimmed_text;
+    $event->{'kategorie'}=$root->look_down('_tag'=>'div','class'=>'entry-data side right')->as_trimmed_text;
     # Name
-    $event->{'name'}=$root->look_down('_tag'=>'h1',class=>qr/entry-data center/)->as_trimmed_text;
+    $event->{'titel'}=$root->look_down('_tag'=>'h1',class=>qr/entry-data center/)->as_trimmed_text;
     # Untertitel
     try {
-	$event->{'name'}.=" - ".$root->look_down('_tag'=>'div','class'=>'entry entry-normal opened')->look_down('_tag'=>'div','class'=>'entry-content')->look_down('_tag'=>'h4')->as_trimmed_text;
+	$event->{'titel'}.=" - ".$root->look_down('_tag'=>'div','class'=>'entry entry-normal opened')->look_down('_tag'=>'div','class'=>'entry-content')->look_down('_tag'=>'h4')->as_trimmed_text;
     };
     # Beschreibung
     try {
-	$event->{'description'}=$root->look_down('_tag'=>'div','class'=>'entry entry-normal opened')->look_down('_tag'=>'div','class'=>'entry-content')->look_down('_tag'=>'div','class'=>undef)->as_trimmed_text;
+	$event->{'beschreibung'}=$root->look_down('_tag'=>'div','class'=>'entry entry-normal opened')->look_down('_tag'=>'div','class'=>'entry-content')->look_down('_tag'=>'div','class'=>undef)->as_trimmed_text;
     };
 
 
@@ -108,7 +110,7 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     shift(@infos);
 
     # Kategorie steht in zweiter Zeile
-    $event->{'category'}=$infos[0];
+    $event->{'kategorie'}=$infos[0];
     shift(@infos);
 
     # Restliche Info-Zeilen
@@ -131,10 +133,10 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 	push(@additionalDescription,"Tickets: ".$mech->find_link(text=>'Tickets')->url_abs()->as_string);
     };
 
-    $event->{'description'}=join(" \n\n",
+    $event->{'beschreibung'}=join(" \n\n",
 	(
 	    join(" \n",@additionalDescription),
-	    $event->{'description'}//"")
+	    $event->{'beschreibung'}//"")
 	);
 
     push(@eventList,$event);
@@ -165,12 +167,10 @@ foreach my $event (@eventList) {
                     $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
 
     my $description;
-    $description.="Kategorie: ".$event->{'category'}." \n";
-    #if ($event->{'preis'})	{ $description.=$event->{'preis'}." \n"; }
     if ($event->{'einlass'}) {
 	$description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute)."\ n";
     }
-    $description.=" \n".$event->{'description'};
+    $description.=" \n".$event->{'beschreibung'};
 
     # Ende festlegen
     $event->{'ende'}=$event->{'beginn'}->clone();
@@ -180,9 +180,9 @@ foreach my $event (@eventList) {
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
-	summary => $event->{'name'},
+	summary => $event->{'titel'},
 	description => $description,
-	categories => $event->{'category'},
+	categories => $event->{'kategorie'},
 	dtstart => DateTime::Format::ICal->format_datetime(
 	    DateTime->new(
 		year=>$event->{'beginn'}->year,
