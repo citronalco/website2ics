@@ -182,7 +182,7 @@ foreach my $event (@eventList) {
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
-	summary => $event->{'name'},
+	summary => $event->{'titel'},
 	description => $event->{'description'},
 	categories => $event->{'category'},
 	dtstart => DateTime::Format::ICal->format_datetime(
