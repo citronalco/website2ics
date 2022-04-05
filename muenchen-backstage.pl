@@ -62,25 +62,33 @@ do {
 
 	my $root=HTML::TreeBuilder->new_from_content($mech->content());
 
+	# Kurzbeschreibung
+	$event->{'kurzbeschreibung'}=$root->look_down('_tag'=>'meta','property'=>'og:description')->attr('content');
+
 	my $info=$root->look_down('_tag'=>'div','class'=>'product-info-main');
 	# Kategorie
-	$event->{'category'}=$info->look_down('_tag'=>'a','class'=>'ox-product-page__category-link')->as_trimmed_text;
+	$event->{'kategorie'}=$info->look_down('_tag'=>'a','class'=>'ox-product-page__category-link')->as_trimmed_text;
 
 	my $innerInfo=$info->look_down('_tag'=>'div','class'=>'page-title-wrapper product');
-	# Name
-	$event->{'name'}=$innerInfo->look_down('_tag'=>'h1','class'=>'page-title')->as_trimmed_text;
-	# Untertitel
-	$event->{'name'}.=" - ".$innerInfo->look_down('_tag'=>'h1','class'=>'page-title')->right()->as_trimmed_text;
+	# Titel
+	$event->{'titel'}=$innerInfo->look_down('_tag'=>'h1','class'=>'page-title')->as_trimmed_text;
+	$event->{'titel'}=~s/([\w'’]+)/\u\L$1/g;
 
+	# Untertitel
+	try {
+	    $event->{'titel'}.=" - ".$innerInfo->look_down('_tag'=>'h1','class'=>'page-title')->right()->as_trimmed_text;
+	};
 
 	my $essentialInfo=$info->look_down('_tag'=>'div','class'=>'product-info-essential');
-	# Preis
+	# Preis und Link zu Tickets
 	try {
-	    $event->{'preis'}=$essentialInfo->look_down('_tag'=>'span','class'=>'price')->as_trimmed_text;
+	    my $link=$event->{'ticketUrl'}=$mech->find_link('url'=>'#bstickets');
+	    $event->{'preis'}=$link->text();
+	    $event->{'tickets'}=$link->url_abs()->as_string;
 	};
 
 	# Ort
-	$event->{'location'}=$essentialInfo->look_down('_tag'=>'div','class'=>'product attribute eventlocation')->look_down('_tag'=>'div','class'=>'value')->as_trimmed_text;
+	$event->{'ort'}=$essentialInfo->look_down('_tag'=>'div','class'=>'product attribute eventlocation')->look_down('_tag'=>'div','class'=>'value')->as_trimmed_text;
 
 	# Veranstalter
 	$event->{'veranstalter'}=$essentialInfo->look_down('_tag'=>'div','class'=>'product attribute eventpresenter')->look_down('_tag'=>'div','class'=>'value')->as_trimmed_text;
@@ -108,7 +116,7 @@ do {
 
 	# Beschreibung
 	try {
-	    $event->{'description'}=$info->look_down('_tag'=>'div','id'=>'description')->as_trimmed_text;
+	    $event->{'beschreibung'}=$info->look_down('_tag'=>'div','id'=>'description')->as_trimmed_text;
 	};
 
 	$success=1;
@@ -143,24 +151,29 @@ foreach my $event (@eventList) {
                     $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
 
     my $description;
-    $description.="Kategorie: ".$event->{'category'}." \n";
-    if ($event->{'preis'})	{ $description.=$event->{'preis'}." \n"; }
-    if ($event->{'einlass'}) {
-	$description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute)."\ n";
-    }
+    if ($event->{'kurzbeschreibung'})
+	{ $description.=$event->{'kurzbeschreibung'}." \n\n"; }
+    if ($event->{'preis'})
+	{ $description.=$event->{'preis'}." \n"; }
+    if ($event->{'tickets'})
+	{ $description.=$event->{'tickets'}." \n"; }
+    if ($event->{'einlass'})
+	{ $description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute)." \n"; }
+
+    if ($event->{'beschreibung'})
+	{ $description.=" \n".$event->{'beschreibung'}." \n\n"; }
+
+
     if ($event->{'veranstalter'}) {
-	$description.="Veranstalter: ".$event->{'veranstalter'}." \n";
-    }
-    if ($event->{'description'}) {
-        $description.=" \n".$event->{'description'};
+	$description.="Veranstalter: ".$event->{'veranstalter'};
     }
 
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
-	summary => $event->{'name'},
+	summary => $event->{'titel'},
 	description => $description,
-	categories => $event->{'category'},
+	categories => $event->{'kategorie'},
 	dtstart => DateTime::Format::ICal->format_datetime(
 	    DateTime->new(
 		year=>$event->{'beginn'}->year,
