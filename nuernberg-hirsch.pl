@@ -120,11 +120,13 @@ foreach my $eventLink ($mech->find_all_links('url_regex'=>qr/^https:\/\/www.der-
     $event->{'veranstalter'}=~s/^Veranstalter:, //;
 
     # Eintrittspreise
-    my $preisHTML=$bLinks->look_down('_tag'=>'p','class'=>undef,sub {
-	    $_[0]->as_trimmed_text()=~/€/
-	})->as_HTML;
-    $preisHTML=join(", ",split(/<br\s*\/?>/,$preisHTML));
-    $event->{'preis'}=HTML::TreeBuilder->new_from_content($preisHTML)->as_trimmed_text();
+    try {
+	my $preisHTML=$bLinks->look_down('_tag'=>'p','class'=>undef,sub {
+		$_[0]->as_trimmed_text()=~/€/
+	    })->as_HTML;
+	$preisHTML=join(", ",split(/<br\s*\/?>/,$preisHTML));
+	$event->{'preis'}=HTML::TreeBuilder->new_from_content($preisHTML)->as_trimmed_text();
+    };
 
     # Ticket-Link:
     try {
@@ -161,7 +163,7 @@ foreach my $event (@eventList) {
     ### Beschreibung zusammenbauen
     my $description;
     $description.=$event->{'alert'}." \n\n" if ($event->{'alert'});
-    $description.=$event->{'preis'}." \n";
+    $description.=$event->{'preis'}." \n" if ($event->{'preis'});
     $description.="Tickets: ".$event->{'tickets'}." \n" if ($event->{'tickets'});
     $description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute). " \n";
     $description.=" \n".$event->{'beschreibung'}." \n\n";
