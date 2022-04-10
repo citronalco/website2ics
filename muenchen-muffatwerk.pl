@@ -50,7 +50,6 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 	}
     }
     next if $found==1;
-
     # Event-Seite laden
     my $ok=eval { $mech->get($eventLink); }; # sometimes some links are broken
     next unless ($ok);
@@ -60,24 +59,35 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     # Datum
     my $datum=$root->look_down('_tag'=>'div','class'=>'entry-data side left')->as_trimmed_text;
     # "Heute"
-    if (lc($datum)=~/heute/) {
+    if ($datum=~/heute/i) {
 	$event->{'datum'}=strftime "%d.%m.%Y", localtime();
     }
     # "Morgen"
-    elsif (lc($datum)=~/morgen/) {
+    elsif ($datum=~/morgen/i) {
 	$event->{'datum'}=strftime "%d.%m.%Y", localtime(time()+24*60*60);
     }
-    # Mehrtägige Veranstaltung: Nur den ersten angezeigten Tag nehmen, Folgetage haben je eigene Webseiten
-    elsif (lc($datum)=~/^\s*(\d{2})\.bis(\d{2})\.(\d{2})/) {
-	$event->{'datum'}=$1.".".$3.".".strftime "%Y", localtime()
+    # "25. bis 27.08." - Mehrtägige Veranstaltung: Nur den ersten angezeigten Tag nehmen, Folgetage haben je eigene Webseiten
+    elsif ($datum=~/^\s*(\d{2})\.?bis(\d{2})\.(\d{2})/i) {
+	$event->{'datum'}=$1.".".$3.".".strftime "%Y", localtime();
     }
-    # Mehrtägige Veranstaltung: Nur den ersten angezeigten Tag nehmen, Folgetage haben je eigene Webseiten
-    elsif (lc($datum)=~/^\s*(\d{2})\.(\d{2})bis(\d{2})\.(\d{2})/) {
-	$event->{'datum'}=$1.".".$2.".".strftime "%Y", localtime()
+    # "25.08. bis 03.09." -  Mehrtägige Veranstaltung: Nur den ersten angezeigten Tag nehmen, Folgetage haben je eigene Webseiten
+    elsif ($datum=~/^\s*(\d{2})\.(\d{2})\.?bis(\d{2})\.(\d{2})/i) {
+	$event->{'datum'}=$1.".".$2.".".strftime "%Y", localtime();
+    }
+    # "Di 25.08.22"
+    elsif ($datum=~/\w{2}(\d{2})\.(\d{2})(\d{2})/) {
+	$event->{'datum'}=$1.".".$2.".20".$3;
+    }
+    # "Montag ab 12 Uhr geöffnet" -> Biergarten, usw., keine echte Verantstaltung, überspringen
+    elsif ($datum=~/^\D+ab\d+Uhrgeöffnet/i) {
+	next;
+    }
+    # 15./17./18./19.05. - Mehrtägige Veranstaltung: Nur den ersten angezeigten Tag nehmen, Folgetage haben je eigene Webseiten
+    elsif ($datum=~/^(\d+)\.(?:\/\d+\.)+(\d+)\.$/) {
+	$event->{'datum'}=$1.".".$2.".".strftime "%Y", localtime();
     }
     else {
-	$datum=~/\w{2}(\d{2})\.(\d{2})(\d{2})/;
-	$event->{'datum'}=$1.".".$2.".20".$3;
+	die("Unbekanntes Datumsformat: ".$datum."\n");
     }
 
     # Kategorie
@@ -116,8 +126,7 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     # Restliche Info-Zeilen
     foreach (@infos) {
 	next if ($_=~/^\s*$/);
-
-	if ($_=~/Einlass: (\d+)(?:\D(\d+))?.*?\s*Uhr\s+Beginn: (\d+)(?:\D(\d+))?\s*Uhr/) {
+	if ($_=~/Einlass: (\d+)(?:\D(\d+))?.*?\s*Uhr\s*Beginn: (\d+)(?:\D(\d+))?\s*Uhr/) {
 	    $event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":".($2//"00"));
 	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$3.":".($4//"00"));
 	}
@@ -128,6 +137,8 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 	    push(@additionalDescription,$_);
 	}
     }
+    die("Unbekanntes Zeitformat:\nURL: ".$event->{'url'}."\n".$event->{'datum'}."\n".Dumper @infos) unless (($event->{'einlass'}) and ($event->{'beginn'}));
+
     # Ticket-Link
     try {
 	push(@additionalDescription,"Tickets: ".$mech->find_link(text=>'Tickets')->url_abs()->as_string);
