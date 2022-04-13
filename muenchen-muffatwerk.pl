@@ -78,8 +78,8 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     elsif ($datum=~/\w{2}(\d{2})\.(\d{2})(\d{2})/) {
 	$event->{'datum'}=$1.".".$2.".20".$3;
     }
-    # "Montag ab 12 Uhr geöffnet" -> Biergarten, usw., keine echte Verantstaltung, überspringen
-    elsif ($datum=~/^\D+ab\d+Uhrgeöffnet/i) {
+    # "Montag ab 12 Uhr geöffnet" oder: "ab 12 Uhr" (wenn "heute" oder "morgen")  -> Biergarten, usw., keine echte Verantstaltung, überspringen
+    elsif ($datum=~/^\D*ab\d+Uhr/i) {
 	next;
     }
     # 15./17./18./19.05. - Mehrtägige Veranstaltung: Nur den ersten angezeigten Tag nehmen, Folgetage haben je eigene Webseiten
@@ -87,7 +87,7 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 	$event->{'datum'}=$1.".".$2.".".strftime "%Y", localtime();
     }
     else {
-	die("Unbekanntes Datumsformat: ".$datum."\n");
+	die("Unbekanntes Datumsformat: ".$datum."\n".$event->{'url'}."\n");
     }
 
     # Kategorie
