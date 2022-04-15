@@ -68,8 +68,13 @@ foreach my $article ($programm->look_down('_tag'=>'article','class'=>qr/event/))
     };
 
     # Beginn
-    my $beginn=$event->{'beginn'}=$article->look_down('_tag'=>'span','class'=>'event__beginn')->as_trimmed_text;
-    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$beginn);
+    try {
+	my $beginn=$event->{'beginn'}=$article->look_down('_tag'=>'span','class'=>'event__beginn')->as_trimmed_text;
+	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$beginn);
+    };
+
+    if (!($event->{'einlass'}) and ($event->{'beginn'})) { $event->{'einlass'}=$event->{'beginn'}; }
+    if (!($event->{'beginn'}) and ($event->{'einlass'})) { $event->{'beginn'}=$event->{'einlass'}; }
 
     # Ende
     $event->{'ende'}=$event->{'beginn'}->clone();
