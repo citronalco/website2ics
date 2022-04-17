@@ -138,7 +138,10 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 	    push(@additionalDescription,$_);
 	}
     }
-    die("Unbekanntes Zeitformat:\nURL: ".$event->{'url'}."\n".$event->{'datum'}."\n".Dumper @infos) unless (($event->{'einlass'}) and ($event->{'beginn'}));
+    if (!$event->{'einlass'} and !$event->{'beginn'}) {
+	$event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." 00:00");
+	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." 00:00");
+    }
 
     # Ticket-Link
     try {
