@@ -112,12 +112,14 @@ foreach my $eventLink ($mech->find_all_links('url_regex'=>qr/^https:\/\/www.der-
     $event->{'ort'}=~s/ > /, /;
 
     # Veranstalter
-    my $veranstalterHTML=$bLinks->look_down('_tag'=>'p','class'=>'smallfont', sub {
-	    $_[0]->as_trimmed_text()=~/Veranstalter:/
-	})->as_HTML;
-    $veranstalterHTML=join(", ",split(/<br\s*\/?>/,$veranstalterHTML));
-    $event->{'veranstalter'}=HTML::TreeBuilder->new_from_content($veranstalterHTML)->as_trimmed_text();
-    $event->{'veranstalter'}=~s/^Veranstalter:, //;
+    try {
+	my $veranstalterHTML=$bLinks->look_down('_tag'=>'p','class'=>'smallfont', sub {
+		$_[0]->as_trimmed_text()=~/Veranstalter:/
+	    })->as_HTML;
+	$veranstalterHTML=join(", ",split(/<br\s*\/?>/,$veranstalterHTML));
+	$event->{'veranstalter'}=HTML::TreeBuilder->new_from_content($veranstalterHTML)->as_trimmed_text();
+	$event->{'veranstalter'}=~s/^Veranstalter:, //;
+    };
 
     # Eintrittspreise
     try {
@@ -167,7 +169,7 @@ foreach my $event (@eventList) {
     $description.="Tickets: ".$event->{'tickets'}." \n" if ($event->{'tickets'});
     $description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute). " \n";
     $description.=" \n".$event->{'beschreibung'}." \n\n";
-    $description.= "Veranstalter: ".$event->{'veranstalter'};
+    $description.= "Veranstalter: ".$event->{'veranstalter'} if ($event->{'veranstalter'});
 
     # Ende festlegen
     $event->{'ende'}=$event->{'beginn'}->clone();
