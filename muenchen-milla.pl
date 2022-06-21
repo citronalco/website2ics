@@ -61,50 +61,84 @@ foreach my $eventBox ($root->look_down('_tag'=>'div','class'=>'preview-box-wrapp
 
     ## Unterseite aufrufen
     $mech->get($event->{'url'}) or die($!);
+    print "\n\n\n".$event->{'url'}."\n";
     my $page=HTML::TreeBuilder->new();
     $page->ignore_unknown(0);       # "article"-Tag wird sonst nicht erkannt
     $page->parse_content($mech->content());
 
-    ## Beschreibung
+    ## Beschreibungstext
     my $text=$page->look_down('_tag'=>'div','class'=>'text-wrapper')->as_trimmed_text();
-    # Text hat zwei Teile: Inhaltsbeschreibung und, nach ein paar Tildezeichen, Organisatorisches
-    $text=~/(.*?)\~\~\~\~\~\~+(.*)/;
-    $event->{'beschreibung'}=$1;
-    my $orga=$2;
+
+    # Beschreibungstext hat normalerweise zwei Teile: Inhaltsbeschreibung und, nach ein paar Tildezeichen, Organisatorisches
+    my $orga;
+    if ($text=~/(.+?)\~\~\~\~\~\~+(.+)/) {
+	$event->{'beschreibung'}=$1;
+	$orga=$2;
+    }
+    else {
+	# Ohne Trenner kompletten Text als Beschreibung verwenden..
+	$event->{'beschreibung'}=$text;
+	# ...und versuchen, daraus Einlass, Beginn und Preise rauszufinden
+	$orga=$text;
+    }
+
     # "Organisatorisches" enthält AK, VVK, Einlass, Beginn usw.
     if ($orga=~/(VVK:?\s+[\d,\.]+\s€ zzgl\. Geb\.)/) {
-	$event->{'vvk'}=$1;
+        $event->{'vvk'}=$1;
     }
     if ($orga=~/(AK:?\s+[\d,\.]+\s€)/) {
-	$event->{'ak'}=$1;
+        $event->{'ak'}=$1;
     }
 
     if ($orga=~/Einlass:?\s+(\d+)[:\.](\d+)/) {
-	$event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":".$2);
+        $event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":".$2);
+    }
+    elsif ($orga=~/(\d+)[:\.](\d+) (?:Uhr )?Einlass/) {
+        $event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":".$2);
     }
     elsif ($orga=~/Einlass:?\s+(\d+)[:\.]/) {	# Minuten "00" wird gelegenlich als "oo" geschrieben...
-	$event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":00");
+        $event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":00");
     }
     elsif ($orga=~/(\d+)[:\.].{2} Einlass/) {	# Minuten "00" wird gelegenlich als "oo" geschrieben, und "Einlass" danach
-	$event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":00");
+        $event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":00");
     }
 
     if ($orga=~/Beginn:?\s+(\d+)[:\.](\d+)/) {
-	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":".$2);
+        $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":".$2);
+    }
+    elsif ($orga=~/(\d+)[:\.](\d+) (?:Uhr )?Beginn/) {
+        $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":".$2);
     }
     elsif ($orga=~/Beginn:?\s+(\d+)[:\.]/) {	# Minuten "00" wird gelegenlich als "oo" geschrieben...
-	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":00");
+        $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":00");
     }
     elsif ($orga=~/(\d+)[:\.].{2} Beginn/) {	# Minuten "00" wird gelegenlich als "oo" geschrieben, und "Beginn" danach
-	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":00");
+        $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":00");
+    }
+    elsif ($orga=~/Beginn:? (\d+) Uhr/) {	# Minuten werden gelegentlich weggelassen
+        $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":00");
     }
 
-    next if (!$event->{'einlass'} and !$event->{'beginn'}); # keine vernünftige Zeitangabe -> kein Kalendereintrag!
+    if (!$event->{'einlass'} and !$event->{'beginn'}) {
+	# 15 – 22 Uhr, 15-22:14 Uhr, 14:15 bis 16 Uhr,...
+	if ($orga=~/(\d+):?(\d{2})?\s*(?:bis|[\-–])\s*(\d+):?(\d{2})?\s+Uhr/) {
+	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":".($2//"00"));
+	    $event->{'ende'}=$datumFormat->parse_datetime($event->{'datum'}." ".$3.":".($4//"00"));
+	}
+	else {
+	    # keine vernünftige Zeitangabe -> kein Kalendereintrag!
+	    #print $event->{'url'};
+	    #print $text."\n";
+	    next;
+	}
+    }
 
     $event->{'beginn'}=$event->{'einlass'} unless ($event->{'beginn'});
 
-    $event->{'ende'}=$event->{'beginn'}->clone();
-    $event->{'ende'}->add(minutes=>$defaultDauer);
+    unless ($event->{'ende'}) {
+	$event->{'ende'}=$event->{'beginn'}->clone();
+	$event->{'ende'}->add(minutes=>$defaultDauer);
+    }
 
     push (@eventList,$event);
 }
