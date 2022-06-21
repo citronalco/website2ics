@@ -22,9 +22,10 @@ use Data::Dumper;
 use warnings;
 
 
-my $url="https://www.brightyoga.de/offene-stunden-wochenplan/";
+my @urls=(
+    { 'url' => "https://www.brightyoga.de/offene-stunden-wochenplan/", 'ort' => "Bright Yoga, Griesmühlstraße 2, Ingolstadt" },
+    { 'url' => "https://www.brightyoga.de/offene-stunden-wochenplan-stream/", 'ort' => "Livestream" } );
 
-my $ort="Bright Yoga, Griesmühlstraße 2, Ingolstadt";
 my $beschreibungsUrl="https://www.brightyoga.de/termine/kursbeschreibungen/";
 
 
@@ -34,80 +35,79 @@ my $today=DateTime->now('time_zone'=>'Europe/Berlin');
 binmode STDOUT, ":utf8";	# Gegen "wide character"-Warnungen
 
 my $mech=WWW::Mechanize->new();
-$mech->get($url) or die($!);
-
 
 my @eventList;
-# alle Tage durchgehen
-my $root=HTML::TreeBuilder->new();
-$root->ignore_unknown(0);       # "time"-Tag wird sonst nicht erkannt
-$root->parse_content($mech->content());
+foreach my $u (@urls) {
+    $mech->get($u->{'url'}) or die($!);
+
+    # alle Tage durchgehen
+    my $root=HTML::TreeBuilder->new();
+    $root->ignore_unknown(0);       # "time"-Tag wird sonst nicht erkannt
+    $root->parse_content($mech->content());
 
 
-foreach my $column ($root->look_down('_tag'=>'div','class'=>'mptt-column')) {
-    # Wochentag
-    my $day=$column->look_down('class'=>'mptt-column-title')->as_trimmed_text;
+    foreach my $column ($root->look_down('_tag'=>'div','class'=>'mptt-column')) {
+        # Wochentag
+        my $day=$column->look_down('class'=>'mptt-column-title')->as_trimmed_text;
 
-    my $date=$today->clone;
-    my $dow=first_index { $_ eq lc($day) } @dayNames;
-    $date->add(days=>($dow - $date->day_of_week) %7);
+        my $date=$today->clone;
+        my $dow=first_index { $_ eq lc($day) } @dayNames;
+        $date->add(days=>($dow - $date->day_of_week) %7);
 
-    foreach my $entry ($column->look_down('class'=>'mptt-list-event')) {
-	my $event;
+        foreach my $entry ($column->look_down('class'=>'mptt-list-event')) {
+	    my $event;
 
-	# Beginn
-	my $startTime=$entry->look_down('class'=>'timeslot-start')->as_trimmed_text;
-	$startTime=~/(\d+).(\d+)/;
-	$event->{'start'}=$date->clone;
-	$event->{'start'}->set_hour($1);
-	$event->{'start'}->set_minute($2);
-	$event->{'start'}->set_second(0);
+	    # Beginn
+	    my $startTime=$entry->look_down('class'=>'timeslot-start')->as_trimmed_text;
+	    $startTime=~/(\d+).(\d+)/;
+	    $event->{'start'}=$date->clone;
+	    $event->{'start'}->set_hour($1);
+	    $event->{'start'}->set_minute($2);
+	    $event->{'start'}->set_second(0);
 
-	# Ende
-	my $endTime=$entry->look_down('class'=>'timeslot-end')->as_trimmed_text;
-	$endTime=~/(\d+).(\d+)/;
-	$event->{'end'}=$date->clone;
-	$event->{'end'}->set_hour($1);
-	$event->{'end'}->set_minute($2);
-	$event->{'end'}->set_second(0);
+	    # Ende
+	    my $endTime=$entry->look_down('class'=>'timeslot-end')->as_trimmed_text;
+	    $endTime=~/(\d+).(\d+)/;
+	    $event->{'end'}=$date->clone;
+	    $event->{'end'}->set_hour($1);
+	    $event->{'end'}->set_minute($2);
+	    $event->{'end'}->set_second(0);
 
-	# Titel
-	$event->{'title'}=$entry->look_down('class'=>'mptt-event-title')->as_trimmed_text;
+	    # Titel
+	    $event->{'title'}=$entry->look_down('class'=>'mptt-event-title')->as_trimmed_text;
 
-	# Anmeldelink
-	$event->{'url'}=$entry->look_down('class'=>'mptt-event-link')->attr('href');
-	# Freie Plätze
-	#$event->{'emptyseats'}=$entry->look_down('class'=>'event-attendance')->as_trimmed_text;
+	    # Anmeldelink
+	    $event->{'url'}=$entry->look_down('class'=>'mptt-event-link')->attr('href');
+	    # Freie Plätze
+	    #$event->{'emptyseats'}=$entry->look_down('class'=>'event-attendance')->as_trimmed_text;
 
-	# Anzahl der freien Plätze steht nicht mehr in der Terminübersicht, daher auf Anmeldeseite wechseln
-	$mech->get($event->{'url'});
-	my $loginRoot=HTML::TreeBuilder->new();
-	$loginRoot->ignore_unknown(0);       # "time"-Tag wird sonst nicht erkannt
-	$loginRoot->parse_content($mech->content());
-	try {
-	    $event->{'emptyseats'}=$loginRoot->look_down('_tag'=>'p','class'=>'availability')->as_trimmed_text;
-	} catch {
-	    # z.B. "Feiertag. Kurs findet nicht statt"
-	    # Sicherheitshalbernoch auf "Anmelden"-Knopf prüfen
-	    next unless ($mech->find_link(text=>'Anmelden'));
-	};
+	    # Anzahl der freien Plätze steht nicht mehr in der Terminübersicht, daher auf Anmeldeseite wechseln
+	    $mech->get($event->{'url'});
+	    my $loginRoot=HTML::TreeBuilder->new();
+	    $loginRoot->ignore_unknown(0);       # "time"-Tag wird sonst nicht erkannt
+	    $loginRoot->parse_content($mech->content());
+	    try {
+		$event->{'emptyseats'}=$loginRoot->look_down('_tag'=>'p','class'=>'availability')->as_trimmed_text;
+	    } catch {
+		# z.B. "Feiertag. Kurs findet nicht statt"
+		# Sicherheitshalbernoch auf "Anmelden"-Knopf prüfen
+		next unless ($mech->find_link(text=>'Anmelden'));
+	    };
 
-	# Subtitel
-	try {
-	    $event->{'subtitle'}=$entry->look_down('class'=>'event-subtitle')->as_trimmed_text;
-	};
-	# User
-	$event->{'trainer'}=$entry->look_down('class'=>'event-user')->as_trimmed_text;
+	    # Subtitel
+	    try {
+		$event->{'subtitle'}=$entry->look_down('class'=>'event-subtitle')->as_trimmed_text;
+	    };
+	    # User
+	    $event->{'trainer'}=$entry->look_down('class'=>'event-user')->as_trimmed_text;
 
-	# Stream oder Studio?
-	if ($event->{'title'}=~/Stream\)/i) {
-	    $event->{'location'}="Livestream";
-	    $event->{'emptyseats'}="Ohne Teilnehmerbegrenzung";
+	    # Stream oder Studio?
+	    $event->{'location'}=$u->{'ort'};
+	    if ($event->{'location'}=~/Livestream/) {
+		$event->{'emptyseats'}="Ohne Teilnehmerbegrenzung";
+	    }
+	    push(@eventList,$event);
 	}
-	elsif ($event->{'title'}=~/Studio\)/i) {
-	    $event->{'location'}="Studio";
-	}
-	push(@eventList,$event);
     }
 }
 
