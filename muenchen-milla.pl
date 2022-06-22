@@ -61,12 +61,12 @@ foreach my $eventBox ($root->look_down('_tag'=>'div','class'=>'preview-box-wrapp
 
     ## Unterseite aufrufen
     $mech->get($event->{'url'}) or die($!);
-    print "\n\n\n".$event->{'url'}."\n";
     my $page=HTML::TreeBuilder->new();
     $page->ignore_unknown(0);       # "article"-Tag wird sonst nicht erkannt
     $page->parse_content($mech->content());
 
     ## Beschreibungstext
+    my $text_html=$page->look_down('_tag'=>'div','class'=>'text-wrapper')->as_HTML();
     my $text=$page->look_down('_tag'=>'div','class'=>'text-wrapper')->as_trimmed_text();
 
     # Beschreibungstext hat normalerweise zwei Teile: Inhaltsbeschreibung und, nach ein paar Tildezeichen, Organisatorisches
@@ -120,21 +120,23 @@ foreach my $eventBox ($root->look_down('_tag'=>'div','class'=>'preview-box-wrapp
     }
 
     if (!$event->{'einlass'} and !$event->{'beginn'}) {
-	# 15 – 22 Uhr, 15-22:14 Uhr, 14:15 bis 16 Uhr,...
-	if ($orga=~/(\d+):?(\d{2})?\s*(?:bis|[\-–])\s*(\d+):?(\d{2})?\s+Uhr/) {
+	# 15 – 22 Uhr, 15-22:14 Uhr, 14:15 bis 16 Uhr,... - aus HTML kratzen
+	if ($text_html=~/(\d+):?(\d{2})?\s*(?:bis|[\-–]|&ndash;|&dash;)\s*(\d+):?(\d{2})?\s+Uhr/i) {
 	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":".($2//"00"));
 	    $event->{'ende'}=$datumFormat->parse_datetime($event->{'datum'}." ".$3.":".($4//"00"));
 	}
-	else {
-	    # keine vernünftige Zeitangabe -> kein Kalendereintrag!
-	    #print $event->{'url'};
-	    #print $text."\n";
-	    next;
-	}
     }
 
-    $event->{'beginn'}=$event->{'einlass'} unless ($event->{'beginn'});
+    # Wenn überhaupt keine Zeitangabe gefunden werden konnte: Als Ganztagesevent eintragen
+    if (!$event->{'einlass'} and !$event->{'beginn'}) {
+	#die($event->{'url'});
+	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." 00:00");
+	$event->{'ende'}=$datumFormat->parse_datetime($event->{'datum'}." 23:59");
+    }
 
+    # Fehlende Zeitangaben ergänzen
+    $event->{'einlass'}=$event->{'beginn'} unless ($event->{'einlass'});
+    $event->{'beginn'}=$event->{'einlass'} unless ($event->{'beginn'});
     unless ($event->{'ende'}) {
 	$event->{'ende'}=$event->{'beginn'}->clone();
 	$event->{'ende'}->add(minutes=>$defaultDauer);
