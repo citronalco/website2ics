@@ -60,7 +60,12 @@ foreach my $eventBox ($root->look_down('_tag'=>'div','class'=>'preview-box-wrapp
     };
 
     ## Unterseite aufrufen
-    $mech->get($event->{'url'}) or die($!);
+    try {
+	$mech->get($event->{'url'});
+    }
+    catch {
+	next;
+    };
     my $page=HTML::TreeBuilder->new();
     $page->ignore_unknown(0);       # "article"-Tag wird sonst nicht erkannt
     $page->parse_content($mech->content());
