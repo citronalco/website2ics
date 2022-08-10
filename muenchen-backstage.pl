@@ -104,7 +104,7 @@ do {
 	};
 	next unless($datumzeit); # Ohne Datum kein Kalendereintrag möglich!
 
-	my ($day,$monthname,$year,$beginnHH,$beginnMM,$einlassHH,$einlassMM)=$datumzeit=~/\w+ (\d{1,2})\. (\w+) (\d{4})Beginn(\d{1,2})[:\.](\d{2}) UhrEinlass(\d{1,2})[:\.](\d{2}) Uhr/;
+	my ($day,$monthname,$year,$beginnHH,$beginnMM,$einlassHH,$einlassMM)=$datumzeit=~/\w+ (\d{1,2})\. (\w+) (\d{4})Beginn(\d{1,2})[:\.](\d{2}) UhrEinlass(\d{1,2})[:\.]0?(\d{2}) Uhr/;
 	# Monatsname nach Monatsnummer
 	my $month=1+first_index { $_ eq lc($monthname) } @months;
 	$event->{'einlass'}=$datumFormat->parse_datetime($day.".".$month.".".$year." ".$einlassHH.":".$einlassMM);
