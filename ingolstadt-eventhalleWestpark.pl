@@ -20,7 +20,7 @@ use utf8;
 use warnings;
 
 
-my $url="https://www.eventhalle-westpark.de/das-programm";
+my $url="https://www.eventhalle-westpark.de/programm-tickets/";
 my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht im Programm, wird aber für Kalendereintrag gebraucht)
 
 my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%d.%m.%Y %H.%M','time_zone'=>'Europe/Berlin');
@@ -32,103 +32,83 @@ $mech->get($url) or die($!);
 
 my @eventList;
 # alle event-links auslesen..
-my @eventLinks=$mech->content()=~/class=\"thumbnail event event-clickable\" onclick=\"showModal\(\d+,\s*\'(https:\/\/www\.eventhalle-westpark.de\/.+?)\'\);\"/g;
+my @eventLinks=$mech->find_all_links(class=>'event-box-title mb-1 box-link');
+
 # ...und durchgehen
 foreach my $eventLink (@eventLinks) {
-    my $event;
 
     my $ok=eval { $mech->get($eventLink); }; # sometimes some links are broken
     next unless ($ok);
 
-    my ($name,$genre,$datum,$kurztext,$einlass,$beginn,$vorverkauf,$abendkasse,$langtext,$ort,$veranstalter);
+    my $event;
+
+    # URL
+    $event->{'url'}=($mech->uri())->as_string;
+    #print "URL: ".$event->{'url'}."\n";
 
     my $root=HTML::TreeBuilder->new_from_content($mech->content());
 
     # Name
-    $name=($root->look_down('_tag'=>'h4','class'=>'modal-title'))->as_trimmed_text;
-    $event->{'name'}=$name;
+    $event->{'title'}=$root->look_down('id'=>'eventName')->as_trimmed_text;
+    # Untertitel
+    $event->{'subtitle'}=$root->look_down('id'=>'eventSubtitle')->as_trimmed_text;
+    # -> Titel
+    $event->{'name'}=join(": ",$event->{'title'},$event->{'subtitle'});
 
-    my $tree=$root->look_down('_tag'=>'table','class'=>'table table-condensed detail-table');
+    # Genre
+    $event->{'genre'}=$root->look_down('id'=>'eventGenre')->as_trimmed_text;
 
     # Datum
-    $datum=($tree->look_down('_tag'=>'td',
-				    sub {
-					$_[0]->as_text=~/Datum:/
-				    }
-			    )->right)->as_trimmed_text;
-
-
-    # Einlass und Beginn stehen in einer Zeile
-    my $einlassBeginn=($tree->look_down('_tag'=>'td',
-				    sub {
-					$_[0]->as_text=~/Einlass:/
-				    }
-			    )->right)->as_trimmed_text;
-    ($event->{'einlass'})=$einlassBeginn=~/^(\d+\.\d+) Uhr/;
-    ($event->{'beginn'})=$einlassBeginn=~/(\d+\.\d+) Uhr$/;
-    $event->{'einlass'}=$datumFormat->parse_datetime($datum." ".$event->{'einlass'});
-    $event->{'beginn'}=$datumFormat->parse_datetime($datum." ".$event->{'beginn'});
-
+    my $datum=($root->look_down('id'=>'eventDate'))->as_trimmed_text;
+    # Einlass
+    my $einlass=($root->look_down('id'=>'eventStarttime'))->as_trimmed_text;
+    $event->{'einlass'}=$datumFormat->parse_datetime($datum." ".$einlass);
+    # Beginn
+    my $beginn=($root->look_down('id'=>'eventStagetime'))->as_trimmed_text;
+    $event->{'beginn'}=$datumFormat->parse_datetime($datum." ".$beginn);
     # Ende=Beginn+$defaultDauer
     $event->{'ende'}=$event->{'beginn'}->clone();
     $event->{'ende'}->add(minutes=>$defaultDauer);
 
-    # Preise für Vorverkauf und Abendkasse stehen in einer Zeile
+    # Ort
+    $event->{'ort'}=($root->look_down('id'=>'eventLocation'))->as_trimmed_text;
+
+    # Veranstalter
+    $event->{'veranstalter'}=($root->look_down('id'=>'eventOrganizer'))->as_trimmed_text;
+
+    # Preis VVK
+    $event->{'vorverkauf'}=$root->look_down('id'=>'eventPrice')->as_trimmed_text // "ohne Vorverkauf";
+
+    # Preis AK
     try {
-	my $ticketPreis=($tree->look_down('_tag'=>'td',
-				    sub {
-					$_[0]->as_text=~/Ticketpreis:/
-				    }
-			    )->right)->as_trimmed_text;
-	($event->{'vorverkauf'})=$ticketPreis=~/^([\d\.\,]+ €)/;
-	($event->{'abendkasse'})=$ticketPreis=~/Abendkasse: ([\d\.,]+ €)/;
+	$event->{'abendkasse'}=$root->look_down('id'=>'eventPriceAk')->as_trimmed_text;
+    } catch {
+	$event->{'abendkasse'}="ohne Abendkasse";
     };
 
-    # Der Ort fehlt ab und zu
+    # Eintrittskarten-Link
     try {
-	$event->{'ort'}=($tree->look_down('_tag'=>'td',
-				    sub { 
-				      $_[0]->as_text=~/Location:/
-				    }
-			    )->right)->as_trimmed_text;
-    }
-    catch {
-	try {
-	    my $locationAlert=($tree->look_down('_tag'=>'td','class'=>'location-alert'))->as_trimmed_text;
-	    ($event->{'ort'})=$locationAlert=~/Die Veranstaltung findet in folgender Location statt: (.+$)/;
+	$event->{'ticketUrl'}=$mech->find_link(text_regex=>qr/Ticket kaufen/)->url_abs();
+    } catch {
+	if ($root->look_down('_tag'=>'button', 'title'=>'In den Warenkorb')) {
+	    $event->{'ticketUrl'}=$event->{'url'};
 	}
     };
 
+    # Bestuhlt?
+    for my $fact ($root->look_down('_tag'=>'div', 'class'=>'event-stage-facts row')) {
+	if ($fact->as_trimmed_text=~/^Bestuhlt (ja|nein)/i) {
+	    if ($1=~/ja/i) {
+		$event->{'bestuhlt'}=1;
+	    }
+	    else {
+		$event->{'bestuhlt'}=0;
+	    }
+	}
+    }
+
     # Beschreibung
-    try {
-	$event->{'description'}=($root->look_down('_tag'=>'div','id'=>'beschreibung'))->as_text;
-    };
-
-    # Stil
-    $event->{'genre'}=($tree->look_down('_tag'=>'td',
-				    sub {
-					$_[0]->as_text=~/Stil:/
-				    }
-			    )->right)->as_trimmed_text;
-
-    # Sonstiges
-    try {
-	$event->{'sonstiges'}=($tree->look_down('_tag'=>'td',
-				    sub {
-					$_[0]->as_text=~/Sonstiges:/
-				    }
-			    )->right)->as_trimmed_text;
-    };
-
-    # Veranstalter
-    $event->{'veranstalter'}=($tree->look_down('_tag'=>'td',
-				    sub {
-					$_[0]->as_text=~/Veranstalter:/
-				    }
-			    )->right)->as_trimmed_text;
-
-    # URL
-    $event->{'url'}=($mech->uri())->as_string;
+    $event->{'description'}=$root->look_down('id'=>'eventDescription')->as_text;
 
     push (@eventList,$event);
 #    print Dumper $event;
@@ -161,8 +141,16 @@ foreach my $event (@eventList) {
     my $description;
     if ($event->{'vorverkauf'})	{ $description.="Vorverkauf: ".$event->{'vorverkauf'}." \n"; }
     if ($event->{'abendkasse'})	{ $description.="Abendkasse: ".$event->{'abendkasse'}." \n"; }
+    if ($event->{'ticketUrl'} )	{ $description.="Kartenvorverkauf: ".$event->{'ticketUrl'}." \n"; }
     $description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute)." \n";
-    if ($event->{'sonstiges'})	{ $description.="Sonstiges: ".$event->{'sonstiges'}." \n"; }
+    if ($event->{'bestuhlt'})	{ 
+	if ($event->{'bestuhlt'} eq 1) {
+	    $description.="Bestuhlung: Ja\n";
+	}
+	else {
+	    $description.="Bestuhlung: Nein\n";
+	}
+    }
     $description.=" \n".$event->{'description'};
 
     my $eventEntry=Data::ICal::Entry::Event->new();
