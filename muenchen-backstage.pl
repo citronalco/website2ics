@@ -6,6 +6,7 @@ use strict;
 use WWW::Mechanize;
 use HTML::Entities;
 use HTML::TreeBuilder;
+use HTML::Strip;
 
 use DateTime::Format::Strptime;
 use DateTime::Format::ICal;
@@ -20,110 +21,129 @@ use utf8;
 use Data::Dumper;
 use warnings;
 
+use JSON;
 
-my $url="https://backstage.eu/veranstaltungen.html";
-my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht im Programm, wird aber für Kalendereintrag gebraucht)
+my $htmlStripper=HTML::Strip->new();
 my @months=("januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember");
+my $url="https://backstage.eu/veranstaltungskalender";
+my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht im Programm, wird aber für Kalendereintrag gebraucht)
 
-
-my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%d.%m.%Y %H:%M','time_zone'=>'Europe/Berlin');
+my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%m/%d/%Y %H:%M','time_zone'=>'Europe/Berlin');
 binmode STDOUT, ":utf8";	# Gegen "wide character"-Warnungen
 
 my $mech=WWW::Mechanize->new();
+$mech->get($url);
+
+my ($var_vevent)=$mech->content()=~/var vaevents\s*=\s*(\[\s*.*\])\s*;/;
+my $vevents=decode_json($var_vevent);
 
 my @eventList;
+for my $vevent (@{$vevents}) {
+    my $event;
 
-my $pageNo=1;
-my $success;
-
-do {
-    $success=0;
-    $mech->get($url."?p=".$pageNo++) or die($!);
-    foreach my $eventLink ($mech->find_all_links(class=>'product-item-link')) {
-	my $event;
-
-	# URL
-	$event->{'url'}=$eventLink->url_abs()->as_string;
-	#print $event->{'url'}."\n";
-
-	# Bereits vorhandene überspringen
-	my $found=0;
-	foreach my $e (@eventList) {
-	    if ($e->{'url'} eq $event->{'url'}) {
-		$found=1;
-		last;
-	    }
-	}
-	next if $found==1;
-
-	# Event-Seite laden
-	my $ok=eval { $mech->get($eventLink); }; # sometimes some links are broken
-	next unless ($ok);
-
-	my $root=HTML::TreeBuilder->new_from_content($mech->content());
-
-	# Kurzbeschreibung
-	$event->{'kurzbeschreibung'}=$root->look_down('_tag'=>'meta','property'=>'og:description')->attr('content');
-
-	my $info=$root->look_down('_tag'=>'div','class'=>'product-info-main');
-	# Kategorie
-	$event->{'kategorie'}=$info->look_down('_tag'=>'a','class'=>'ox-product-page__category-link')->as_trimmed_text;
-
-	my $innerInfo=$info->look_down('_tag'=>'div','class'=>'page-title-wrapper product');
-	# Titel
-	$event->{'titel'}=$innerInfo->look_down('_tag'=>'h1','class'=>'page-title')->as_trimmed_text;
-	$event->{'titel'}=~s/([\w'’]+)/\u\L$1/g;
-
-	# Untertitel
-	try {
-	    $event->{'titel'}.=" - ".$innerInfo->look_down('_tag'=>'h1','class'=>'page-title')->right()->as_trimmed_text;
-	};
-
-	my $essentialInfo=$info->look_down('_tag'=>'div','class'=>'product-info-essential');
-	# Preis und Link zu Tickets
-	try {
-	    my $link=$event->{'ticketUrl'}=$mech->find_link('url'=>'#bstickets');
-	    $event->{'preis'}=$link->text();
-	    $event->{'tickets'}=$link->url_abs()->as_string;
-	};
-
-	# Ort
-	$event->{'ort'}=$essentialInfo->look_down('_tag'=>'div','class'=>'product attribute eventlocation')->look_down('_tag'=>'div','class'=>'value')->as_trimmed_text;
-
-	# Veranstalter
-	$event->{'veranstalter'}=$essentialInfo->look_down('_tag'=>'div','class'=>'product attribute eventpresenter')->look_down('_tag'=>'div','class'=>'value')->as_trimmed_text;
-
-	# Datum und Zeit
-	my $datumzeit;
-	try {
-	    $datumzeit=$essentialInfo->look_down('_tag'=>'strong','class'=>'type',
-		sub {
-		    $_[0]->as_text=~/^Veranstaltungsdatum/
-		}
-	    )->right()->as_trimmed_text;
-	};
-	next unless($datumzeit); # Ohne Datum kein Kalendereintrag möglich!
-
-	my ($day,$monthname,$year,$beginnHH,$beginnMM,$einlassHH,$einlassMM)=$datumzeit=~/\w+ (\d{1,2})\. (\w+) (\d{4})Beginn(\d{1,2})[:\.](\d{2}) UhrEinlass(\d{1,2})[:\.]0?(\d{2}) Uhr/;
-	# Monatsname nach Monatsnummer
-	my $month=1+first_index { $_ eq lc($monthname) } @months;
-	$event->{'einlass'}=$datumFormat->parse_datetime($day.".".$month.".".$year." ".$einlassHH.":".$einlassMM);
-	$event->{'beginn'}=$datumFormat->parse_datetime($day.".".$month.".".$year." ".$beginnHH.":".$beginnMM);
-
-	$event->{'ende'}=$event->{'beginn'}->clone();
-	$event->{'ende'}->add(minutes=>$defaultDauer);
-
-
-	# Beschreibung
-	try {
-	    $event->{'beschreibung'}=$info->look_down('_tag'=>'div','id'=>'description')->as_trimmed_text;
-	};
-
-	$success=1;
-	push(@eventList,$event);
+    # Wenn kein vevent->time und ein Badge ("abgesagt", "verlegt",...) -> überspringen
+    if ($vevent->{'time'} eq "" and defined($vevent->{'badge'})) {
+	next;
     }
+
+    # URL
+    $event->{'url'}=$vevent->{'url'};
+
+    # Titel
+    $event->{'titel'}=$vevent->{'name'};
+    $event->{'titel'}=~s/([\w'’]+)/\u\L$1/g;
+
+    # Genre
+    $event->{'genre'}=$htmlStripper->parse($vevent->{'description'});
+
+    # Ort
+    $event->{'ort'}=$vevent->{'venue'};
+
+    # Beginn
+    $event->{'beginn'}=$datumFormat->parse_datetime($vevent->{'date'}." ".$vevent->{'time'});
+
+    # Event-Seite laden
+    my $ok=eval { $mech->get($event->{'url'}); }; # sometimes some links are broken
+    next unless ($ok);
+
+    my $root=HTML::TreeBuilder->new_from_content($mech->content());
+
+    my $info=$root->look_down('_tag'=>'div','class'=>'product-info-main');
+    # Kategorie ("Live", "Public Viewing",...)
+
+    my $categoryLink = $event->{'kategorie'}=$info->look_down('_tag'=>'a','class'=>'ox-product-page__category-link');
+    if ($categoryLink) {
+	$event->{'kategorie'}=$categoryLink->as_trimmed_text;
+    }
+    else {
+	$event->{'kategorie'}="unbekannt";
+    }
+
+    my $innerInfo=$info->look_down('_tag'=>'div','class'=>'page-title-wrapper product');
+
+    # Untertitel
+    try {
+	my $subtitle=$innerInfo->look_down('_tag'=>'h1','class'=>'page-title')->right()->as_trimmed_text;
+        $event->{'titel'}.=" - ".$subtitle;
+    };
+
+    my $essentialInfo=$info->look_down('_tag'=>'div','class'=>'product-info-essential');
+    # Preis und Link zu Tickets
+    try {
+	my $link=$event->{'ticketUrl'}=$mech->find_link('url'=>'#bstickets');
+	$event->{'preis'}=$link->text();
+	$event->{'tickets'}=$link->url_abs()->as_string;
+    };
+
+    # Veranstalter
+    $event->{'veranstalter'}=$essentialInfo->look_down('_tag'=>'div','class'=>'product attribute eventpresenter')->look_down('_tag'=>'div','class'=>'value')->as_trimmed_text;
+
+    # Einlass - FIXME: Richtigen Tag suchen!
+    my $datumzeit;
+    my @rows=$essentialInfo->look_down('_tag'=>'strong','class'=>'type',
+	sub {
+	    $_[0]->as_text=~/^Veranstaltungsdatum/
+	})->right();
+
+    # richtige Zeile bei den Veranstaltungsdaten suchen
+    my $f=0;
+    for my $row (@rows) {
+	$datumzeit=$row->as_trimmed_text;
+	my ($day,$monthname,$year,$beginnHH,$beginnMM,$einlassHH,$einlassMM)=$datumzeit=~/\w+ (\d{1,2})\. (\w+) (\d{4})Beginn(\d{1,2})[:\.](\d{2}) UhrEinlass(\d{1,2})[:\.]0?(\d{2}) Uhr/;
+	my $month=1+first_index { $_ eq lc($monthname) } @months;
+	my $d = sprintf("%0.2d/%0.2d/%d",$month,$day,$year);
+	next unless ($d=~$vevent->{'date'});
+
+	# Beginn nochmal setzen, gelegentlich fehlt der in vevent. Dann muss aber das Datum stimmen!
+	unless ($event->{'beginn'}) {
+	    $event->{'beginn'}=$datumFormat->parse_datetime($month."/".$day."/".$year." ".$beginnHH.":".$beginnMM) unless($event->{'beginn'});
+	}
+
+	# Einlass
+	try {
+	    $event->{'einlass'}=$event->{'beginn'}->clone();
+	    $event->{'einlass'}->set_hour($einlassHH);
+	    $event->{'einlass'}->set_minute($einlassMM);
+	};
+	last;
+    }
+
+    # Ende
+    $event->{'ende'}=$event->{'beginn'}->clone();
+    $event->{'ende'}->add(minutes=>$defaultDauer);
+
+    # Beschreibung
+    try {
+	$event->{'beschreibung'}=$info->look_down('_tag'=>'div','id'=>'description')->as_trimmed_text;
+    };
+
+    unless ($event->{'beginn'}) {
+	next;
+    }
+
+    push(@eventList,$event);
 }
-while ($success);
+
 
 
 # Create Datestamp for dtstamp
@@ -151,6 +171,8 @@ foreach my $event (@eventList) {
                     $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
 
     my $description;
+    if ($event->{'genre'})
+	{ $description.="Genre: ".$event->{'genre'}." \n\n"; }
     if ($event->{'kurzbeschreibung'})
 	{ $description.=$event->{'kurzbeschreibung'}." \n\n"; }
     if ($event->{'preis'})
