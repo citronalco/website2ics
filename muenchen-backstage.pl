@@ -53,8 +53,8 @@ for my $vevent (@{$vevents}) {
     $event->{'titel'}=$vevent->{'name'};
     $event->{'titel'}=~s/([\w'’]+)/\u\L$1/g;
 
-    # Genre
-    $event->{'genre'}=$htmlStripper->parse($vevent->{'description'});
+    # Genre - deaktiviert, enthält zu viel Müll
+    #$event->{'genre'}=$htmlStripper->parse($vevent->{'description'});
 
     # Ort
     $event->{'ort'}=$vevent->{'venue'};
@@ -171,8 +171,8 @@ foreach my $event (@eventList) {
                     $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
 
     my $description;
-    if ($event->{'genre'})
-	{ $description.="Genre: ".$event->{'genre'}." \n\n"; }
+    #if ($event->{'genre'})
+    #	{ $description.="Genre: ".$event->{'genre'}." \n\n"; }
     if ($event->{'kurzbeschreibung'})
 	{ $description.=$event->{'kurzbeschreibung'}." \n\n"; }
     if ($event->{'preis'})
