@@ -12,6 +12,7 @@ use DateTime::Format::ICal;
 use Data::ICal;
 use Data::ICal::Entry::Event;
 use Time::HiRes;
+use Time::Piece;
 
 use List::MoreUtils qw(first_index);
 
@@ -47,14 +48,14 @@ foreach my $u (@urls) {
 
 
     foreach my $column ($root->look_down('_tag'=>'div','class'=>'mptt-column')) {
-        # Wochentag
-        my $day=$column->look_down('class'=>'mptt-column-title')->as_trimmed_text;
+	# Wochentag
+	my $day=$column->look_down('class'=>'mptt-column-title')->as_trimmed_text;
 
-        my $date=$today->clone;
-        my $dow=first_index { $_ eq lc($day) } @dayNames;
-        $date->add(days=>($dow - $date->day_of_week) %7);
+	my $date=$today->clone;
+	my $dow=first_index { $_ eq lc($day) } @dayNames;
+	$date->add(days=>($dow - $date->day_of_week) %7);
 
-        foreach my $entry ($column->look_down('class'=>'mptt-list-event')) {
+	foreach my $entry ($column->look_down('class'=>'mptt-list-event')) {
 	    my $event;
 
 	    # Beginn
@@ -86,13 +87,24 @@ foreach my $u (@urls) {
 	    my $loginRoot=HTML::TreeBuilder->new();
 	    $loginRoot->ignore_unknown(0);       # "time"-Tag wird sonst nicht erkannt
 	    $loginRoot->parse_content($mech->content());
-	    try {
-		$event->{'emptyseats'}=$loginRoot->look_down('_tag'=>'p','class'=>'availability')->as_trimmed_text;
-	    } catch {
-		# z.B. "Feiertag. Kurs findet nicht statt"
-		# Sicherheitshalbernoch auf "Anmelden"-Knopf prüfen
-		next unless ($mech->find_link(text=>'Anmelden'));
-	    };
+
+	    # Spalte mit passendem Datum suchen
+	    my @spalten=$loginRoot->look_down('_tag'=>'div','class'=>'slide');
+	    foreach my $spalte (@spalten) {
+		# "MONTAG, 15.3.2022"
+		my $datestring=$spalte->look_down('_tag'=>'h3')->as_trimmed_text;
+		$datestring=~s/(^\D+,\s+)//;
+		my $columndate=Time::Piece->strptime($datestring, "%d.%m.%Y");
+		if ($event->{'start'}->strftime("%d.%m.%Y") eq $columndate->strftime("%d.%m.%Y")) {
+		    try {
+			# Abgesagte Veranstaltungen haben keine availability
+			$event->{'emptyseats'}=$spalte->look_down('_tag'=>'p','class'=>'availability')->as_trimmed_text;
+		    }
+		    catch { };
+		    last;
+		}
+	    }
+	    next unless defined($event->{'emptyseats'});
 
 	    # Subtitel
 	    try {
