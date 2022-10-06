@@ -135,6 +135,10 @@ for my $vevent (@{$vevents}) {
     # Beschreibung
     try {
 	$event->{'beschreibung'}=$info->look_down('_tag'=>'div','id'=>'description')->as_trimmed_text;
+	# Ersetze Unicode-Linebreaks durch normale
+	$event->{'beschreibung'}=~s/\R/\n/g;
+	# Nichtdruckbare Zeichen (^H usw) ausfiltern
+	$event->{'beschreibung'}=~s/[^[:print:]]+//g;
     };
 
     unless ($event->{'beginn'}) {
