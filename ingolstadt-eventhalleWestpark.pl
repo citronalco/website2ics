@@ -77,7 +77,12 @@ foreach my $eventLink (@eventLinks) {
     $event->{'veranstalter'}=($root->look_down('id'=>'eventOrganizer'))->as_trimmed_text;
 
     # Preis VVK
-    $event->{'vorverkauf'}=$root->look_down('id'=>'eventPrice')->as_trimmed_text // "ohne Vorverkauf";
+    try {
+	$event->{'vorverkauf'}=$root->look_down('id'=>'eventPrice')->as_trimmed_text
+    }
+    catch {
+	 $event->{'vorverkauf'}="ohne Vorverkauf";
+    };
 
     # Preis AK
     try {
