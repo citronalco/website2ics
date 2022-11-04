@@ -73,12 +73,21 @@ foreach my $article ($programm->look_down('_tag'=>'article','class'=>qr/event/))
 	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$beginn);
     };
 
-    if (!($event->{'einlass'}) and ($event->{'beginn'})) { $event->{'einlass'}=$event->{'beginn'}; }
-    if (!($event->{'beginn'}) and ($event->{'einlass'})) { $event->{'beginn'}=$event->{'einlass'}; }
+    # Weder Einlass- noch Beginnuhrzeit? -> Ganztages-Event
+    if (!($event->{'einlass'}) and !($event->{'beginn'})) {
+	$event->{'fullday'} = 1;
+	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." 00:00");
+	$event->{'ende'}=$datumFormat->parse_datetime($event->{'datum'}." 23:59");
+    }
+    else {
+	if (!($event->{'einlass'}) and ($event->{'beginn'})) { $event->{'einlass'}=$event->{'beginn'}; }
+	if (!($event->{'beginn'}) and ($event->{'einlass'})) { $event->{'beginn'}=$event->{'einlass'}; }
 
-    # Ende
-    $event->{'ende'}=$event->{'beginn'}->clone();
-    $event->{'ende'}->add(minutes=>$defaultDauer);
+	# Ende
+	$event->{'ende'}=$event->{'beginn'}->clone();
+	$event->{'ende'}->add(minutes=>$defaultDauer);
+    }
+
 
     try {
 	# Abgesagte Events sind zwar im Programm, aber mit anderen Klassen. Müssen nicht extra rausgefiltert werden.
@@ -130,34 +139,45 @@ foreach my $event (@eventList) {
     $description.="Einlass: ".sprintf("%.2d",$event->{'einlass'}->hour).":".sprintf("%.2d",$event->{'einlass'}->min)." Uhr \n" if ($event->{'einlass'});
     $description.="\n ".$event->{'beschreibung'}." \n";
 
+    my ($startTime,$endTime);
+    if ($event->{'fullday'}) {
+	$startTime=sprintf("%04d%02d%02d",$event->{'beginn'}->year,$event->{'beginn'}->month,$event->{'beginn'}->day);
+	$endTime=sprintf("%04d%02d%02d",$event->{'ende'}->year,$event->{'ende'}->month,$event->{'ende'}->day), 
+    }
+    else {
+        $startTime=DateTime::Format::ICal->format_datetime(
+            DateTime->new(
+                year=>$event->{'beginn'}->year,
+                month=>$event->{'beginn'}->month,
+                day=>$event->{'beginn'}->day,
+                hour=>$event->{'beginn'}->hour,
+                minute=>$event->{'beginn'}->min,
+                second=>0,
+                #time_zone=>'Europe/Berlin'
+            )
+        );
+
+        $endTime=DateTime::Format::ICal->format_datetime(
+            DateTime->new(
+                year=>$event->{'ende'}->year,
+                month=>$event->{'ende'}->month,
+                day=>$event->{'ende'}->day,
+                hour=>$event->{'ende'}->hour,
+                minute=>$event->{'ende'}->min,
+                second=>0,
+                #time_zone=>'Europe/Berlin'
+            )
+        );
+    }
+
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
 	summary => $event->{'titel'},
 	description => $description,
 	categories => $event->{'category'},
-	dtstart => DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'beginn'}->year,
-		month=>$event->{'beginn'}->month,
-		day=>$event->{'beginn'}->day,
-		hour=>$event->{'beginn'}->hour,
-		minute=>$event->{'beginn'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-	    )
-	),
-	dtend => DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'ende'}->year,
-		month=>$event->{'ende'}->month,
-		day=>$event->{'ende'}->day,
-		hour=>$event->{'ende'}->hour,
-		minute=>$event->{'ende'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-	    )
-	),
+        dtstart=>$startTime,
+        dtend=>$endTime,
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
 	organizer=>"MAILTO:foobar",
