@@ -94,7 +94,7 @@ foreach my $eventLink ($mech->find_all_links('url_regex'=>qr/^https:\/\/www.der-
 
     # Datum
     my $datumLong=$bLinks->look_down('_tag'=>'h2')->as_trimmed_text();
-    my ($datum)=$datumLong=~/^\w\w\. (\d{2}\.\d{2}\.\d{4})$/;
+    my ($datum)=$datumLong=~/^\w\w\. (\d{2}\.\d{2}\.\d{4})/;
 
     # Einlass + Beginn, Bestuhlung
     my $einlassBeginn=$bLinks->look_down('_tag'=>'p','class'=>undef,sub {
