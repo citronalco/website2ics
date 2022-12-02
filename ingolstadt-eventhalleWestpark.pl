@@ -55,20 +55,26 @@ foreach my $eventLink (@eventLinks) {
     # -> Titel
     $event->{'name'}=join(": ",$event->{'title'},$event->{'subtitle'});
 
-    # Genre
-    $event->{'genre'}=$root->look_down('id'=>'eventGenre')->as_trimmed_text;
-
     # Datum
     my $datum=($root->look_down('id'=>'eventDate'))->as_trimmed_text;
-    # Einlass
-    my $einlass=($root->look_down('id'=>'eventStarttime'))->as_trimmed_text;
-    $event->{'einlass'}=$datumFormat->parse_datetime($datum." ".$einlass);
-    # Beginn
-    my $beginn=($root->look_down('id'=>'eventStagetime'))->as_trimmed_text;
-    $event->{'beginn'}=$datumFormat->parse_datetime($datum." ".$beginn);
+
+    try {
+	# Einlass
+	my $einlass=($root->look_down('id'=>'eventStarttime'))->as_trimmed_text;
+	$event->{'einlass'}=$datumFormat->parse_datetime($datum." ".$einlass);
+	# Beginn
+	my $beginn=($root->look_down('id'=>'eventStagetime'))->as_trimmed_text;
+	$event->{'beginn'}=$datumFormat->parse_datetime($datum." ".$beginn);
+    };
+    # Events ohne Uhrzeit sind abgesagte Events
+    next unless ($event->{'einlass'});
+
     # Ende=Beginn+$defaultDauer
     $event->{'ende'}=$event->{'beginn'}->clone();
     $event->{'ende'}->add(minutes=>$defaultDauer);
+
+    # Genre
+    $event->{'genre'}=$root->look_down('id'=>'eventGenre')->as_trimmed_text;
 
     # Ort
     $event->{'ort'}=($root->look_down('id'=>'eventLocation'))->as_trimmed_text;
