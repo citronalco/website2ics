@@ -58,7 +58,7 @@ foreach my $eventLink ($mech->find_all_links('url_regex'=>qr/^https:\/\/www.der-
     ### Großer Block rechts: Titel, Untertitel, Beschreibung
     my $bRechts=$root->look_down('_tag'=>'div','class'=>qr/column_start rechteSpalte/)
 	    ->look_down('_tag'=>'div','class'=>'mod_eventreader block')
-		->look_down('_tag'=>'div','class'=>'event block');
+		->look_down('_tag'=>'div','class'=>qr/event block/);
 
     # Beschreibung
     $event->{'beschreibung'}=$bRechts->look_down('_tag'=>'div','class'=>'ce_text block')->as_trimmed_text();
@@ -83,7 +83,7 @@ foreach my $eventLink ($mech->find_all_links('url_regex'=>qr/^https:\/\/www.der-
     ### Info-Block links: Datum, Einlass, Beginn, Ort, Preis, Ticket-Link, Veranstalter
     my $bLinks=$root->look_down('_tag'=>'div','class'=>qr/column_start linkeSpalte/)
 	    ->look_down('_tag'=>'div','class'=>'mod_eventreader block')
-		->look_down('_tag'=>'div','class'=>'event block');
+		->look_down('_tag'=>'div','class'=>qr/event block/);
 
     # Rote Hinweisbox
     try {

@@ -79,6 +79,7 @@ foreach my $u (@urls) {
 
 	    # Anmeldelink
 	    $event->{'url'}=$entry->look_down('class'=>'mptt-event-link')->attr('href');
+
 	    # Freie Plätze
 	    #$event->{'emptyseats'}=$entry->look_down('class'=>'event-attendance')->as_trimmed_text;
 
@@ -173,6 +174,7 @@ foreach my $event (@eventList) {
     $calendar->add_entry($eventEntry);
     $count++;
 }
+
 die("Keine Einträge") if ($count==0);
 
 print $calendar->as_string;
