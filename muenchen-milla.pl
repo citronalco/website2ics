@@ -6,6 +6,7 @@ use strict;
 use WWW::Mechanize;
 use HTML::Entities;
 use HTML::TreeBuilder;
+use HTML::FormatText;
 
 use DateTime::Format::Strptime;
 use DateTime::Format::ICal;
@@ -63,6 +64,7 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	$headline=$headline->look_down('_tag'=>'div','class'=>qr/columns/);
 	# Titel
 	$event->{'titel'}=$headline->look_down('_tag'=>'h1')->as_trimmed_text();
+
 	# und der Rest
 	my ($monatsname,$tag,$wochentag,$stunde,$minute,$kategorien)=$headline->as_HTML()=~/<span class="is-date">\s*(\w\w\w)\s+(\d+)\s*<\/span>\s*<span>(\w+)\s+(\d+)[\.: ](\d+)<\/span>\s*<span>(.*)<\/span>/;
 	# Datum - leider fehlt das Jahr
@@ -71,7 +73,7 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	my $monat=1+first_index { $_ eq lc($monatsname) } @monatsnamen;
 	$event->{'einlass'}=$datumFormat->parse_datetime($tag.".".$monat.".".$jahr." ".$stunde.":".$minute);
 	# wenn z.B. durch Jahreswechsel die so erstellte Einlasszeit zu weit in der Vergangenheit liegt: 1 Jahr dazuzuzählen
-	if ($event->{'einlass'}->add(months => -1) < $now) {
+	if ($event->{'einlass'} < $now->add(months => -1)) {
 	    $event->{'einlass'}=$event->{'einlass'}->add(years => 1);
 	}
 	$event->{'beginn'}=$event->{'einlass'}->clone();
@@ -88,11 +90,14 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	## Beschreibungstext ("content")
 	my $content=$page->look_down('_tag'=>'div','class'=>'content');
 	my $text_html=$content->as_HTML();
-	my $text=$content->as_trimmed_text();
+
+	#my $text=$content->as_trimmed_text();
+	my $formatter=HTML::FormatText->new(leftmargin=>0, rightmargin=>1000);
+	my $text=$content->format($formatter);
 
 	# Beschreibungstext hat normalerweise zwei Teile: Inhaltsbeschreibung und, nach ein paar Tildezeichen, Organisatorisches
 	my $orga;
-	if ($text=~/(.+?)\~\~\~\~\~\~+(.+)/) {
+	if ($text=~/(.+?)\n*\~\~\~\~\~\~+\n*(.+)/s) {
 	    $event->{'beschreibung'}=$1;
 	    $orga=$2;
 	}
@@ -103,13 +108,7 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	    $orga=$text;
 	}
 
-
 	# "Organisatorisches" enthält Datum, AK, VVK, Einlass, Beginn usw.
-	# Datum von oben wenn möglich überschreiben
-	#if ($orga=~/^\s*(\d{2}\.\d{2}\.\d{4})/) {
-	#    $event->{'datum'}=$1;
-	#}
-
 	if ($orga=~/(VVK:?\s+[\d,\.]+\s€ zzgl\. Geb\.)/) {
 	    $event->{'vvk'}=$1;
 	}
@@ -157,8 +156,8 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	# Wenn überhaupt keine Zeitangabe gefunden werden konnte: Als Ganztagesevent eintragen
 	if (!$event->{'einlass'} and !$event->{'beginn'}) {
 	    #die($event->{'url'});
-	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." 00:00");
-	    $event->{'ende'}=$datumFormat->parse_datetime($event->{'datum'}." 23:59");
+	    $event->{'beginn'}->set(hour=>"0",minute=>"0");
+	    $event->{'ende'}->set(hour=>"23",minute=>"59");
 	}
 
 	# Fehlende Zeitangaben ergänzen
