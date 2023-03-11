@@ -11,6 +11,10 @@ use DateTime::Format::Strptime;
 use DateTime::Format::ICal;
 use Data::ICal;
 use Data::ICal::Entry::Event;
+use Data::ICal::Entry::TimeZone;
+use Data::ICal::Entry::TimeZone::Daylight;
+use Data::ICal::Entry::TimeZone::Standard;
+
 use Time::HiRes;
 
 use Try::Tiny;
@@ -25,6 +29,25 @@ my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht
 
 my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%d.%m.%Y %H.%M','time_zone'=>'Europe/Berlin');
 binmode STDOUT, ":utf8";	# Gegen "wide character"-Warnungen
+
+# convert datetime to DTSTART/DTEND property value
+sub dt2icaldt {
+    my ($dt)=@_;
+    my $icalformatdt=DateTime::Format::ICal->format_datetime($dt);
+    if (my ($id,$string)=$icalformatdt=~/^TZID=(.+?):(.+)$/) {
+        return [ $string, {TZID => $id} ];
+    }
+    else {
+        return $icalformatdt;
+    }
+}
+
+# convert datetime to DTSTART/DTEND property value for allday events
+sub dt2icaldt_fullday {
+    my ($dt)=@_;
+    return [ $dt->ymd(''),{VALUE=>'DATE'} ];
+}
+
 
 my $mech=WWW::Mechanize->new();
 $mech->get($url) or die($!);
@@ -73,6 +96,11 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/${url}event\//)) {
     try {
 	$event->{'beschreibung'}=$root->look_down('_tag'=>'div','class'=>'gdlr-event-content')->as_text;
 	$event->{'beschreibung'}=~s/Der Inhalt ist nicht verfügbar.*?Bitte erlaube Cookies, indem du auf Übernehmen im Banner klickst.//;
+
+        # Ersetze Unicode-Linebreaks durch normale
+        $event->{'beschreibung'}=~s/\R/\n/g;
+        # Nichtdruckbare Zeichen (^H usw) ausfiltern
+        $event->{'beschreibung'}=~s/[^[:print:]]+//g;
     };
 
     my $infoWrapper=$root->look_down('_tag'=>'div','class'=>'gdlr-event-info-wrapper');
@@ -97,6 +125,21 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/${url}event\//)) {
 	$event->{'datum'}=$1;
     };
 
+    # Abgesagt?
+    next if ($infoWrapper->look_down('_tag'=>'div','class'=>'event-status-wrapper',
+		sub {
+		    $_[0]->as_text=~/^Abgesagt/i
+		}
+	    ));
+
+    # Verlegt?
+    next if ($infoWrapper->look_down('_tag'=>'div','class'=>'event-status-wrapper',
+		sub {
+		    $_[0]->as_text=~/^Verlegt/i
+		}
+	    ));
+
+
     # Ohne Datum kein Kalendereintrag
     next unless $event->{'datum'};
 
@@ -107,23 +150,27 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/${url}event\//)) {
 		    $_[0]->as_text=~/^Uhrzeit:/
 		}
 	    )->as_trimmed_text;
-	
 
 	# "Einlass: HH.MM Uhr / Beginn: HH.MM Uhr"
 	# "Einlass & Beginn: HH.MM Uhr"
-	if ($uhrzeit=~/Einlass: (\d+\.\d+) Uhr/) {
-	    $event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1);
+	if ($uhrzeit=~/ (\d{1,2})[\.:](\d{1,2}) .+(\d{1,2})[\.:](\d{1,2}) Uhr/i) {
+	    $event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.".".$2);
+	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$3.".".$4);
 	}
-	if ($uhrzeit=~/Beginn: (\d+\.\d+) Uhr/) {
-	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1);
+	else {
+	    if ($uhrzeit=~/Einlass.*(\d{1,2})[\.:](\d{1,2}) Uhr/i) {
+		$event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.".".$2);
+	    }
+	    if ($uhrzeit=~/Beginn.*(\d{1,2})[\.:](\d{1,2}) Uhr/i) {
+		$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.".".$2);
+	    }
 	}
 
-	$event->{'fullday'}=0;
 	$event->{'ende'}=$event->{'beginn'}->clone();
 	$event->{'ende'}->add(minutes=>$defaultDauer);
 
 	if (!$event->{'beginn'}) {
-	    $event->{'beginn'}=$event->{'einlass'} if ($event->{'einlass'});
+	    $event->{'beginn'}=$event->{'einlass'}->clone() if ($event->{'einlass'});
 	}
     }
     catch {
@@ -170,6 +217,34 @@ $calendar->add_properties(method=>"PUBLISH",
         "X-WR-CALNAME"=>"Strom",
         "X-WR-CALDESC"=>"Veranstaltungen Strom");
 
+# Add VTIMEZONE
+my $tz="Europe/Berlin";
+my $vtimezone=Data::ICal::Entry::TimeZone->new();
+$vtimezone->add_properties(tzid=>$tz);
+
+my $tzDaylight=Data::ICal::Entry::TimeZone::Daylight->new();
+$tzDaylight->add_properties(
+    tzoffsetfrom => "+0100",
+    tzoffsetto  => "+0200",
+    dtstart     => "19700329T020000",
+    tzname      => "CEST",
+    rrule       => "FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzDaylight);
+
+my $tzStandard=Data::ICal::Entry::TimeZone::Standard->new();
+$tzStandard->add_properties(
+    tzoffsetfrom => "+0200",
+    tzoffsetto  => "+0100",
+    dtstart     => "19701025T030000",
+    tzname      => "CET",
+    rrule       => "FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzStandard);
+
+$calendar->add_entry($vtimezone);
+
+
 my $count=0;
 foreach my $event (@eventList) {
     # Create uid
@@ -196,28 +271,8 @@ foreach my $event (@eventList) {
 	summary => $event->{'titel'},
 	description => $description,
 	categories => $event->{'kategorie'},
-	dtstart => DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'beginn'}->year,
-		month=>$event->{'beginn'}->month,
-		day=>$event->{'beginn'}->day,
-		hour=>$event->{'beginn'}->hour,
-		minute=>$event->{'beginn'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-	    )
-	),
-	dtend => DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'ende'}->year,
-		month=>$event->{'ende'}->month,
-		day=>$event->{'ende'}->day,
-		hour=>$event->{'ende'}->hour,
-		minute=>$event->{'ende'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-	    )
-	),
+        dtstart => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'beginn'}) : dt2icaldt($event->{'beginn'}),
+        dtend => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'ende'}) : dt2icaldt($event->{'ende'}),
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
 	organizer=>"MAILTO:foobar",

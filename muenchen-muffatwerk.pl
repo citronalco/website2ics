@@ -11,6 +11,10 @@ use DateTime::Format::Strptime;
 use DateTime::Format::ICal;
 use Data::ICal;
 use Data::ICal::Entry::Event;
+use Data::ICal::Entry::TimeZone;
+use Data::ICal::Entry::TimeZone::Daylight;
+use Data::ICal::Entry::TimeZone::Standard;
+
 use Time::HiRes;
 
 use POSIX qw(strftime);
@@ -18,7 +22,7 @@ use POSIX qw(strftime);
 use Try::Tiny;
 
 use utf8;
-use Data::Dumper;
+#use Data::Dumper;
 use warnings;
 
 
@@ -28,6 +32,25 @@ my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht
 
 my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%d.%m.%Y %H:%M','time_zone'=>'Europe/Berlin');
 binmode STDOUT, ":utf8";	# Gegen "wide character"-Warnungen
+
+# convert datetime to DTSTART/DTEND property value
+sub dt2icaldt {
+    my ($dt)=@_;
+    my $icalformatdt=DateTime::Format::ICal->format_datetime($dt);
+    if (my ($id,$string)=$icalformatdt=~/^TZID=(.+?):(.+)$/) {
+        return [ $string, {TZID => $id} ];
+    }
+    else {
+        return $icalformatdt;
+    }
+}
+
+# convert datetime to DTSTART/DTEND property value for allday events
+sub dt2icaldt_fullday {
+    my ($dt)=@_;
+    return [ $dt->ymd(''),{VALUE=>'DATE'} ];
+}
+
 
 my $mech=WWW::Mechanize->new();
 
@@ -56,42 +79,65 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 
     my $root=HTML::TreeBuilder->new_from_content($mech->content())->look_down('id'=>'content');
 
-    # Datum
+    # Datum - üblicherweise fehlt das Jahr
+    # Bei mehrtägigen Veranstaltungen: Nur den ersten angezeigten Tag nehmen, Folgetage haben je eigene Webseiten
+    my $now=DateTime->now();
+
+    $event->{'beginn'}=$now->clone();
+    #$event->{'ende'}=$now->clone();
+    $event->{'fullday'}=1;
+
     my $datum=$root->look_down('_tag'=>'div','class'=>'entry-data side left')->as_trimmed_text;
     # "Heute"
     if ($datum=~/heute/i) {
-	$event->{'datum'}=strftime "%d.%m.%Y", localtime();
+	# passt schon
     }
     # "Morgen"
     elsif ($datum=~/morgen/i) {
-	$event->{'datum'}=strftime "%d.%m.%Y", localtime(time()+24*60*60);
+	$event->{'beginn'}->add(days=>1);
+	#$event->{'ende'}->add(days=>1);
     }
-    # "25. bis 27.08." - Mehrtägige Veranstaltung: Nur den ersten angezeigten Tag nehmen, Folgetage haben je eigene Webseiten
+    # "25.03&26.03."
+    elsif ($datum=~/^\s*(\d{2})\.(\d{2})\&(\d{2})\.(\d{2})/i) {
+	$event->{'beginn'}->set(day=>$1,month=>$2);
+	#$event->{'ende'}->set(day=>$1,month=>$3);
+    }
+    # "25. bis 27.08."
     elsif ($datum=~/^\s*(\d{2})\.?bis(\d{2})\.(\d{2})/i) {
-	$event->{'datum'}=$1.".".$3.".".strftime "%Y", localtime();
+	$event->{'beginn'}->set(day=>$1,month=>$3);
+	#$event->{'ende'}->set(day=>$1,month=>$3);
     }
-    # "25.08. bis 03.09." -  Mehrtägige Veranstaltung: Nur den ersten angezeigten Tag nehmen, Folgetage haben je eigene Webseiten
+    # "25.08. bis 03.09."
     elsif ($datum=~/^\s*(\d{2})\.(\d{2})\.?bis(\d{2})\.(\d{2})/i) {
-	$event->{'datum'}=$1.".".$2.".".strftime "%Y", localtime();
+	$event->{'beginn'}->set(day=>$1,month=>$2);
+	#$event->{'ende'}->set(day=>$1,month=>$2);
     }
     # "Di 25.08.22"
     elsif ($datum=~/\w{2}(\d{2})\.(\d{2})(\d{2})/) {
-	$event->{'datum'}=$1.".".$2.".20".$3;
+	$event->{'beginn'}->set(day=>$1,month=>$2,year=>"20".$3);
+	#$event->{'ende'}->set(day=>$1,month=>$2,year="20".$3);
     }
-    # 15./17./18./19.05. - Mehrtägige Veranstaltung: Nur den ersten angezeigten Tag nehmen, Folgetage haben je eigene Webseiten
+    # "15./17./18./19.05."
     elsif ($datum=~/^(\d+)\.(?:\/\d+\.)+(\d+)\.$/) {
-	$event->{'datum'}=$1.".".$2.".".strftime "%Y", localtime();
+	$event->{'beginn'}->set(day=>$1,month=>$2);
+	#$event->{'ende'}->set(day=>$1,month=>$2);
     }
-
 
     # "Montag ab 12 Uhr geöffnet" oder: "ab 12 Uhr" (wenn "heute" oder "morgen")  -> Biergarten, usw., keine echte Verantstaltung, überspringen
     elsif ($datum=~/^\D*ab\d+Uhr/i) {
 	next;
     }
     else {
-	#die("Unbekanntes Datumsformat: ".$datum."\n".$event->{'url'}."\n");
-	next;
+	die("Unbekanntes Datumsformat: ".$datum."\n".$event->{'url'}."\n");
+	#next;
     }
+
+    # wenn z.B. durch Jahreswechsel die so erstellte Einlasszeit zu weit in der Vergangenheit liegt: 1 Jahr dazuzuzählen
+    if ($event->{'beginn'} < $now->add(months => -1)) {
+        $event->{'beginn'}=$event->{'beginn'}->add(years => 1);
+    }
+
+
 
     # Kategorie
     $event->{'kategorie'}=$root->look_down('_tag'=>'div','class'=>'entry-data side right')->as_trimmed_text;
@@ -130,8 +176,10 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     foreach (@infos) {
 	next if ($_=~/^\s*$/);
 	if ($_=~/Einlass: (\d+)(?:\D(\d+))?.*?\s*Uhr\s*Beginn: (\d+)(?:\D(\d+))?\s*Uhr/) {
-	    $event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.":".($2//"00"));
-	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$3.":".($4//"00"));
+	    $event->{'einlass'}=$event->{'beginn'}->clone();
+	    $event->{'einlass'}->set(hour=>$1,minute=>($2//"00"));
+	    $event->{'beginn'}->set(hour=>$3,minute=>($4//"00"));
+	    undef($event->{'fullday'});
 	}
 	elsif ($_=~/^\s*Ort: (.+)$/) {
 	    $event->{'ort'}=$1;
@@ -139,10 +187,6 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 	else {
 	    push(@additionalDescription,$_);
 	}
-    }
-    if (!$event->{'einlass'} and !$event->{'beginn'}) {
-	$event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." 00:00");
-	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." 00:00");
     }
 
     # Ticket-Link
@@ -155,6 +199,10 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 	    join(" \n",@additionalDescription),
 	    $event->{'beschreibung'}//"")
 	);
+
+    # Ende festlegen
+    $event->{'ende'}=$event->{'beginn'}->clone();
+    $event->{'ende'}->add(minutes=>$defaultDauer);
 
     push(@eventList,$event);
 }
@@ -175,6 +223,34 @@ $calendar->add_properties(method=>"PUBLISH",
         "X-WR-CALNAME"=>"Muffatwerk",
         "X-WR-CALDESC"=>"Veranstaltungen Muffatwerk");
 
+# Add VTIMEZONE
+my $tz="Europe/Berlin";
+my $vtimezone=Data::ICal::Entry::TimeZone->new();
+$vtimezone->add_properties(tzid=>$tz);
+
+my $tzDaylight=Data::ICal::Entry::TimeZone::Daylight->new();
+$tzDaylight->add_properties(
+    tzoffsetfrom => "+0100",
+    tzoffsetto  => "+0200",
+    dtstart     => "19700329T020000",
+    tzname      => "CEST",
+    rrule       => "FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzDaylight);
+
+my $tzStandard=Data::ICal::Entry::TimeZone::Standard->new();
+$tzStandard->add_properties(
+    tzoffsetfrom => "+0200",
+    tzoffsetto  => "+0100",
+    dtstart     => "19701025T030000",
+    tzname      => "CET",
+    rrule       => "FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzStandard);
+
+$calendar->add_entry($vtimezone);
+
+
 my $count=0;
 foreach my $event (@eventList) {
     # Create uid
@@ -189,10 +265,6 @@ foreach my $event (@eventList) {
     }
     $description.=" \n".$event->{'beschreibung'};
 
-    # Ende festlegen
-    $event->{'ende'}=$event->{'beginn'}->clone();
-    $event->{'ende'}->add(minutes=>$defaultDauer);
-
 
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
@@ -200,28 +272,8 @@ foreach my $event (@eventList) {
 	summary => $event->{'titel'},
 	description => $description,
 	categories => $event->{'kategorie'},
-	dtstart => DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'beginn'}->year,
-		month=>$event->{'beginn'}->month,
-		day=>$event->{'beginn'}->day,
-		hour=>$event->{'beginn'}->hour,
-		minute=>$event->{'beginn'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-	    )
-	),
-	dtend => DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'ende'}->year,
-		month=>$event->{'ende'}->month,
-		day=>$event->{'ende'}->day,
-		hour=>$event->{'ende'}->hour,
-		minute=>$event->{'ende'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-	    )
-	),
+	dtstart => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'beginn'}) : dt2icaldt($event->{'beginn'}),
+	dtend => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'ende'}) : dt2icaldt($event->{'ende'}),
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
 	organizer=>"MAILTO:foobar",

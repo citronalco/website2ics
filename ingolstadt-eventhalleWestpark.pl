@@ -11,6 +11,10 @@ use DateTime::Format::Strptime;
 use DateTime::Format::ICal;
 use Data::ICal;
 use Data::ICal::Entry::Event;
+use Data::ICal::Entry::TimeZone;
+use Data::ICal::Entry::TimeZone::Daylight;
+use Data::ICal::Entry::TimeZone::Standard;
+
 use Time::HiRes;
 
 use Try::Tiny;
@@ -28,6 +32,25 @@ binmode STDOUT, ":utf8";	# Gegen "wide character"-Warnungen
 
 my $mech=WWW::Mechanize->new();
 $mech->get($url) or die($!);
+
+
+# convert datetime to DTSTART/DTEND property value
+sub dt2icaldt {
+    my ($dt)=@_;
+    my $icalformatdt=DateTime::Format::ICal->format_datetime($dt);
+    if (my ($id,$string)=$icalformatdt=~/^TZID=(.+?):(.+)$/) {
+        return [ $string, {TZID => $id} ];
+    }
+    else {
+        return $icalformatdt;
+    }
+}
+
+# convert datetime to DTSTART/DTEND property value for allday events
+sub dt2icaldt_fullday {
+    my ($dt)=@_;
+    return [ $dt->ymd(''),{VALUE=>'DATE'} ];
+}
 
 
 my @eventList;
@@ -141,6 +164,34 @@ $calendar->add_properties(method=>"PUBLISH",
         "X-WR-CALNAME"=>"Eventhalle Westpark",
         "X-WR-CALDESC"=>"Veranstaltungen Eventhalle Westpark");
 
+# Add VTIMEZONE
+my $tz="Europe/Berlin";
+my $vtimezone=Data::ICal::Entry::TimeZone->new();
+$vtimezone->add_properties(tzid=>$tz);
+
+my $tzDaylight=Data::ICal::Entry::TimeZone::Daylight->new();
+$tzDaylight->add_properties(
+    tzoffsetfrom => "+0100",
+    tzoffsetto  => "+0200",
+    dtstart     => "19700329T020000",
+    tzname      => "CEST",
+    rrule       => "FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzDaylight);
+
+my $tzStandard=Data::ICal::Entry::TimeZone::Standard->new();
+$tzStandard->add_properties(
+    tzoffsetfrom => "+0200",
+    tzoffsetto  => "+0100",
+    dtstart     => "19701025T030000",
+    tzname      => "CET",
+    rrule       => "FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzStandard);
+
+$calendar->add_entry($vtimezone);
+
+
 my $count=0;
 foreach my $event (@eventList) {
     # Create uid
@@ -170,29 +221,9 @@ foreach my $event (@eventList) {
 	categories=>$event->{'genre'},
 	summary => $event->{'name'},
 	description => $description,
-	dtstart => DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'beginn'}->year,
-		month=>$event->{'beginn'}->month,
-		day=>$event->{'beginn'}->day,
-		hour=>$event->{'beginn'}->hour,
-		minute=>$event->{'beginn'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-	    )
-	),
+	dtstart => dt2icaldt($event->{'beginn'}),
 	#duration=>"PT3H",
-	dtend => DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'ende'}->year,
-		month=>$event->{'ende'}->month,
-		day=>$event->{'ende'}->day,
-		hour=>$event->{'ende'}->hour,
-		minute=>$event->{'ende'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-	    )
-	),
+	dtend => dt2icaldt($event->{'ende'}),
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
 #	organizer=>"CN=\"".$event->{'veranstalter'}."\"",
@@ -207,4 +238,3 @@ foreach my $event (@eventList) {
 die("Keine Einträge") if ($count==0);
 
 print $calendar->as_string;
-

@@ -11,6 +11,10 @@ use DateTime::Format::Strptime;
 use DateTime::Format::ICal;
 use Data::ICal;
 use Data::ICal::Entry::Event;
+use Data::ICal::Entry::TimeZone;
+use Data::ICal::Entry::TimeZone::Daylight;
+use Data::ICal::Entry::TimeZone::Standard;
+
 use Time::HiRes;
 
 use Try::Tiny;
@@ -27,9 +31,27 @@ my $url="http://www.neun-ingolstadt.de/programm/";
 my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%d.%m.%Y %H:%M','time_zone'=>'Europe/Berlin');
 binmode STDOUT, ":utf8";	# Gegen "wide character"-Warnungen
 
+# convert datetime to DTSTART/DTEND property value
+sub dt2icaldt {
+    my ($dt)=@_;
+    my $icalformatdt=DateTime::Format::ICal->format_datetime($dt);
+    if (my ($id,$string)=$icalformatdt=~/^TZID=(.+?):(.+)$/) {
+	return [ $string, {TZID => $id} ];
+    }
+    else {
+	return $icalformatdt;
+    }
+}
+
+# convert datetime to DTSTART/DTEND property value for allday events
+sub dt2icaldt_fullday {
+    my ($dt)=@_;
+    return [ $dt->ymd(''),{VALUE=>'DATE'} ];
+}
+
+
 my $mech=WWW::Mechanize->new();
 $mech->get($url) or die($!);
-
 
 my @events;
 
@@ -92,44 +114,47 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
 	}
     }
     else {
-#	print STDERR Dumper $h->as_trimmed_text();
-#	exit;
-	next;
+	print STDERR Dumper $h->as_trimmed_text();
+	die();
+	#next;
     }
-    unless ($event->{'enddatum'}) { $event->{'enddatum'}=$event->{'startdatum'}; }
+    unless ($event->{'enddatum'}) {
+	$event->{'enddatum'}=$event->{'startdatum'}->clone();
+    }
 
-
-    # Einlasszeit
-    if (my (undef,$einlasszeit)=$h->as_trimmed_text()=~/Einlass (ab )?(\d{2}:\d{2})/) {
-	if (($einlasszeit) and ($einlasszeit=~/24:00/)) {
-	    $event->{'einlass'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." 00:00");
+    # Zeit Einlass
+    if (my ($stunde,$minute)=$h->as_trimmed_text()=~/Einlass (?:ab )?(\d{2}):(\d{2})/) {
+	$event->{'einlass'}=$event->{'startdatum'}->clone();
+	if ($stunde=~/24/) {
+	    $event->{'einlass'}->set(hour=>0, minute=>$minute);
 	    $event->{'einlass'}->add(days=>1);
 	}
 	else {
-	    $event->{'einlass'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." ".$einlasszeit);
+	    $event->{'einlass'}->set(hour=>$stunde,minute=>$minute);
 	}
 	$event->{'ende'}=$event->{'einlass'}->clone();
 	$event->{'ende'}->add(minutes=>$defaultDauer);
     }
 
-    # Beginn
-    if (my (undef,$beginnzeit)=$h->as_trimmed_text()=~/Beginn (ab )?(\d{2}:\d{2})/) {
-	if (($beginnzeit) and ($beginnzeit=~/24:00/)) {
-	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." 00:00");
+    # Zeit Beginn
+    if (my ($stunde,$minute)=$h->as_trimmed_text()=~/Beginn (?:ab )?(\d{2}):(\d{2})/) {
+	$event->{'beginn'}=$event->{'startdatum'}->clone();
+	if ($stunde=~/24/) {
+	    $event->{'beginn'}->set(hour=>0, minute=>$minute);
 	    $event->{'beginn'}->add(days=>1);
 	}
 	else {
-	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." ".$beginnzeit);
+	    $event->{'beginn'}->set(hour=>$stunde,minute=>$minute);
 	}
 	$event->{'ende'}=$event->{'beginn'}->clone();
 	$event->{'ende'}->add(minutes=>$defaultDauer);
     }
 
     unless ($event->{'beginn'} or $event->{'einlass'}) {
-	# keine Startzeit
-	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." 00:00");
-	$event->{'ende'}=$datumFormat->parse_datetime($event->{'startdatum'}->day.".".$event->{'startdatum'}->month.".".$event->{'startdatum'}->year." 23:59");
+	# keine Startzeit -> Ganztages-Event
+	$event->{'fullday'}=1;
     }
+
 
     ##### Link zu "Mehr Informationen" folgen
     my $moreLink=$articleTree->look_down('_tag'=>'a','class'=>'more')->attr('href');
@@ -158,7 +183,6 @@ foreach my $articleTree ($programmTree->look_down('_tag'=>'article')) {
     push(@events,$event);
 }
 
-#print Dumper @events;
 # Create Datestamp for dtstamp
 my @stamp=localtime;
 my $dstamp = sprintf("%d%02d%02dT%02d%02d%02dZ",
@@ -169,11 +193,41 @@ my $dstamp = sprintf("%d%02d%02dT%02d%02d%02dZ",
     $stamp[1],
     $stamp[0]);
 
+
 my $calendar=Data::ICal->new();
 $calendar->add_properties(method=>"PUBLISH",
 	"X-PUBLISHED-TTL"=>"P1D",
 	"X-WR-CALNAME"=>"Kulturzentrum neun",
-	"X-WR-CALDESC"=>"Veranstaltungen Kulturzentrum neun");
+	"X-WR-CALDESC"=>"Veranstaltungen Kulturzentrum neun",
+);
+
+# Add VTIMEZONE
+my $tz="Europe/Berlin";
+my $vtimezone=Data::ICal::Entry::TimeZone->new();
+$vtimezone->add_properties(tzid=>$tz);
+
+my $tzDaylight=Data::ICal::Entry::TimeZone::Daylight->new();
+$tzDaylight->add_properties(
+    tzoffsetfrom => "+0100",
+    tzoffsetto	=> "+0200",
+    dtstart	=> "19700329T020000",
+    tzname	=> "CEST",
+    rrule	=> "FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzDaylight);
+
+my $tzStandard=Data::ICal::Entry::TimeZone::Standard->new();
+$tzStandard->add_properties(
+    tzoffsetfrom => "+0200",
+    tzoffsetto	=> "+0100",
+    dtstart	=> "19701025T030000",
+    tzname	=> "CET",
+    rrule	=> "FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzStandard);
+
+$calendar->add_entry($vtimezone);
+
 
 my $count=0;
 foreach my $event (@events) {
@@ -182,53 +236,6 @@ foreach my $event (@events) {
     my $uid=sprintf("%d%02d%02d%02d%02d%02d%s%02d\@geierb.de",
                     $tm[5] + 1900, $tm[4] + 1, $tm[3], $tm[2],
                     $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
-
-#    $event->{'datum'}=~/(\d\d)\D(\d\d)\D(\d\d\d\d)/ or next;	# TODO: Mehrtägige Events! Auch oben berücksichtigen!! (17.-19.03.2016 oder 30.06.-02.07.2016)
-    # wenn weder beginn noch einlass gegeben ist ganztages-event bauen
-#    my $startTime="$3$2$1";
-#    my $endTime=$startTime;
-    my ($startTime,$endTime);
-
-    if ($event->{'beginn'}) {
-	$startTime=DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'beginn'}->year,
-		month=>$event->{'beginn'}->month,
-		day=>$event->{'beginn'}->day,
-		hour=>$event->{'beginn'}->hour,
-		minute=>$event->{'beginn'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-           )
-       );
-    }
-    elsif ($event->{'einlass'}) {
-	$startTime=DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'einlass'}->year,
-		month=>$event->{'einlass'}->month,
-		day=>$event->{'einlass'}->day,
-		hour=>$event->{'einlass'}->hour,
-		minute=>$event->{'einlass'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-           )
-       );
-    }
-
-    if ($event->{'ende'}) {
-	$endTime=DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'ende'}->year,
-		month=>$event->{'ende'}->month,
-		day=>$event->{'ende'}->day,
-		hour=>$event->{'ende'}->hour,
-		minute=>$event->{'ende'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-           )
-       );
-    }
 
     # Einlass zu Beschreibung dazu
     if ($event->{'einlass'}) {
@@ -240,17 +247,24 @@ foreach my $event (@events) {
 	uid=>$uid,
 	summary => $event->{'name'},
 	description => $event->{'description'},
-#	dtstart=>$startTime->ical,
-#	dtend=>$endTime->ical,
-	dtstart=>$startTime,
-	dtend=>$endTime,
-#	duration=>"PT3H",
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
         organizer=>"MAILTO:foobar",
 	location=>$event->{'ort'},
 	url=>$event->{'url'},
     );
+    if (defined($event->{'fullday'})) {
+	$eventEntry->add_properties(
+	    dtstart=>dt2icaldt_fullday($event->{'startdatum'}),
+	    dtend=>dt2icaldt_fullday($event->{'enddatum'}),
+	);
+    }
+    else {
+	$eventEntry->add_properties(
+	    dtstart=>dt2icaldt($event->{'beginn'} or $event->{'einlass'}),
+	    dtend=>dt2icaldt($event->{'ende'}),
+        );
+    }
 
     $calendar->add_entry($eventEntry);
     $count++;

@@ -11,8 +11,11 @@ use DateTime::Format::Strptime;
 use DateTime::Format::ICal;
 use Data::ICal;
 use Data::ICal::Entry::Event;
+use Data::ICal::Entry::TimeZone;
+use Data::ICal::Entry::TimeZone::Daylight;
+use Data::ICal::Entry::TimeZone::Standard;
+
 use Time::HiRes;
-use Time::Piece;
 
 use List::MoreUtils qw(first_index);
 
@@ -32,8 +35,27 @@ my $beschreibungsUrl="https://www.brightyoga.de/termine/kursbeschreibungen/";
 
 my @dayNames=("sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag");
 my $today=DateTime->now('time_zone'=>'Europe/Berlin');
-
+my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%d.%m.%Y %H:%M','time_zone'=>'Europe/Berlin');
 binmode STDOUT, ":utf8";	# Gegen "wide character"-Warnungen
+
+# convert datetime to DTSTART/DTEND property value
+sub dt2icaldt {
+    my ($dt)=@_;
+    my $icalformatdt=DateTime::Format::ICal->format_datetime($dt);
+    if (my ($id,$string)=$icalformatdt=~/^TZID=(.+?):(.+)$/) {
+        return [ $string, {TZID => $id} ];
+    }
+    else {
+        return $icalformatdt;
+    }
+}
+
+# convert datetime to DTSTART/DTEND property value for allday events
+sub dt2icaldt_fullday {
+    my ($dt)=@_;
+    return [ $dt->ymd(''),{VALUE=>'DATE'} ];
+}
+
 
 my $mech=WWW::Mechanize->new();
 
@@ -95,8 +117,8 @@ foreach my $u (@urls) {
 		# "MONTAG, 15.3.2022"
 		my $datestring=$spalte->look_down('_tag'=>'h3')->as_trimmed_text;
 		$datestring=~s/(^\D+,\s+)//;
-		my $columndate=Time::Piece->strptime($datestring, "%d.%m.%Y");
-		if ($event->{'start'}->strftime("%d.%m.%Y") eq $columndate->strftime("%d.%m.%Y")) {
+		my $columndate=$datumFormat->parse_datetime($datestring." 00:00");
+		if ($event->{'start'}->ymd eq $columndate->ymd) {
 		    try {
 			# Abgesagte Veranstaltungen haben keine availability
 			$event->{'emptyseats'}=$spalte->look_down('_tag'=>'p','class'=>'availability')->as_trimmed_text;
@@ -140,6 +162,34 @@ $calendar->add_properties(method=>"PUBLISH",
 	"X-WR-CALNAME"=>"Bright Yoga",
 	"X-WR-CALDESC"=>"Offene Stunden bei Bright Yoga");
 
+# Add VTIMEZONE
+my $tz="Europe/Berlin";
+my $vtimezone=Data::ICal::Entry::TimeZone->new();
+$vtimezone->add_properties(tzid=>$tz);
+
+my $tzDaylight=Data::ICal::Entry::TimeZone::Daylight->new();
+$tzDaylight->add_properties(
+    tzoffsetfrom => "+0100",
+    tzoffsetto  => "+0200",
+    dtstart     => "19700329T020000",
+    tzname      => "CEST",
+    rrule       => "FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzDaylight);
+
+my $tzStandard=Data::ICal::Entry::TimeZone::Standard->new();
+$tzStandard->add_properties(
+    tzoffsetfrom => "+0200",
+    tzoffsetto  => "+0100",
+    dtstart     => "19701025T030000",
+    tzname      => "CET",
+    rrule       => "FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzStandard);
+
+$calendar->add_entry($vtimezone);
+
+
 my $count=0;
 foreach my $event (@eventList) {
     # Build description
@@ -161,12 +211,11 @@ foreach my $event (@eventList) {
 	uid=>$uid,
 	summary => $event->{'title'},
 	description => $description,
-	dtstart => DateTime::Format::ICal->format_datetime($event->{'start'}->set_time_zone('UTC')),
-#	duration=>'PT3H',
-	dtend => DateTime::Format::ICal->format_datetime($event->{'end'}->set_time_zone('UTC')),
+	dtstart => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'start'}) : dt2icaldt($event->{'start'}),
+	dtend => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'end'}) : dt2icaldt($event->{'end'}),
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
-        organizer=>'MAILTO:patricia@brightyoga.de',
+	organizer=>'MAILTO:patricia@brightyoga.de',
 	location=>$event->{'location'},
 	url=>$event->{'url'},
     );

@@ -11,6 +11,10 @@ use DateTime::Format::Strptime;
 use DateTime::Format::ICal;
 use Data::ICal;
 use Data::ICal::Entry::Event;
+use Data::ICal::Entry::TimeZone;
+use Data::ICal::Entry::TimeZone::Daylight;
+use Data::ICal::Entry::TimeZone::Standard;
+
 use Time::HiRes;
 
 use POSIX qw(strftime);
@@ -28,6 +32,25 @@ my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht
 
 my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%Y-%m-%d %H:%M','time_zone'=>'Europe/Berlin');
 binmode STDOUT, ":utf8";	# Gegen "wide character"-Warnungen
+
+# convert datetime to DTSTART/DTEND property value
+sub dt2icaldt {
+    my ($dt)=@_;
+    my $icalformatdt=DateTime::Format::ICal->format_datetime($dt);
+    if (my ($id,$string)=$icalformatdt=~/^TZID=(.+?):(.+)$/) {
+        return [ $string, {TZID => $id} ];
+    }
+    else {
+        return $icalformatdt;
+    }
+}
+
+# convert datetime to DTSTART/DTEND property value for allday events
+sub dt2icaldt_fullday {
+    my ($dt)=@_;
+    return [ $dt->ymd(''),{VALUE=>'DATE'} ];
+}
+
 
 my $mech=WWW::Mechanize->new();
 
@@ -123,6 +146,34 @@ $calendar->add_properties(method=>"PUBLISH",
         "X-WR-CALNAME"=>"Z-Bau",
         "X-WR-CALDESC"=>"Veranstaltungen Z-Bau");
 
+# Add VTIMEZONE
+my $tz="Europe/Berlin";
+my $vtimezone=Data::ICal::Entry::TimeZone->new();
+$vtimezone->add_properties(tzid=>$tz);
+
+my $tzDaylight=Data::ICal::Entry::TimeZone::Daylight->new();
+$tzDaylight->add_properties(
+    tzoffsetfrom => "+0100",
+    tzoffsetto  => "+0200",
+    dtstart     => "19700329T020000",
+    tzname      => "CEST",
+    rrule       => "FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzDaylight);
+
+my $tzStandard=Data::ICal::Entry::TimeZone::Standard->new();
+$tzStandard->add_properties(
+    tzoffsetfrom => "+0200",
+    tzoffsetto  => "+0100",
+    dtstart     => "19701025T030000",
+    tzname      => "CET",
+    rrule       => "FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU"
+);
+$vtimezone->add_entry($tzStandard);
+
+$calendar->add_entry($vtimezone);
+
+
 my $count=0;
 foreach my $event (@eventList) {
     # Create uid
@@ -139,45 +190,14 @@ foreach my $event (@eventList) {
     $description.="Einlass: ".sprintf("%.2d",$event->{'einlass'}->hour).":".sprintf("%.2d",$event->{'einlass'}->min)." Uhr \n" if ($event->{'einlass'});
     $description.="\n ".$event->{'beschreibung'}." \n";
 
-    my ($startTime,$endTime);
-    if ($event->{'fullday'}) {
-	$startTime=sprintf("%04d%02d%02d",$event->{'beginn'}->year,$event->{'beginn'}->month,$event->{'beginn'}->day);
-	$endTime=sprintf("%04d%02d%02d",$event->{'ende'}->year,$event->{'ende'}->month,$event->{'ende'}->day), 
-    }
-    else {
-        $startTime=DateTime::Format::ICal->format_datetime(
-            DateTime->new(
-                year=>$event->{'beginn'}->year,
-                month=>$event->{'beginn'}->month,
-                day=>$event->{'beginn'}->day,
-                hour=>$event->{'beginn'}->hour,
-                minute=>$event->{'beginn'}->min,
-                second=>0,
-                #time_zone=>'Europe/Berlin'
-            )
-        );
-
-        $endTime=DateTime::Format::ICal->format_datetime(
-            DateTime->new(
-                year=>$event->{'ende'}->year,
-                month=>$event->{'ende'}->month,
-                day=>$event->{'ende'}->day,
-                hour=>$event->{'ende'}->hour,
-                minute=>$event->{'ende'}->min,
-                second=>0,
-                #time_zone=>'Europe/Berlin'
-            )
-        );
-    }
-
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
 	summary => $event->{'titel'},
 	description => $description,
 	categories => $event->{'category'},
-        dtstart=>$startTime,
-        dtend=>$endTime,
+        dtstart => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'beginn'}) : dt2icaldt($event->{'beginn'}),
+        dtend => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'ende'}) : dt2icaldt($event->{'ende'}),
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
 	organizer=>"MAILTO:foobar",
