@@ -19,16 +19,16 @@ use Try::Tiny;
 use utf8;
 use open qw(:std :utf8);
 
-use Data::Dumper;
+#use Data::Dumper;
 use warnings;
 
-my @events;
+my $url="https://www.ingolstadt.de/Kultur/Veranstaltungen/Veranstaltungskalender";
+
+my $formatter=HTML::FormatText->new(leftmargin=>0, rightmargin=>1000);
 
 my $mech=WWW::Mechanize->new();
 my $hs=HTML::Strip->new();
 
-
-my $url="https://www.ingolstadt.de/Kultur/Veranstaltungen/Veranstaltungskalender";
 
 my @eventList;
 my $currentPage=0;
@@ -67,14 +67,13 @@ do {
 foreach my $eventLink (keys (%links)) {
     my $event;
     $event->{'typ'}=$links{$eventLink}{'typ'};
-    $event->{'fullday'}=0;
 
     $mech->get($eventLink);
 
     my $eTree=HTML::TreeBuilder->new_from_content($mech->content);
     my $eventDetails=$eTree->look_down('_tag'=>'div','id'=>'event-details');
 
-    $event->{'title'}=$eventDetails->find_by_tag_name('h1')->as_text();
+    $event->{'title'}=$eventDetails->find_by_tag_name('h1')->as_trimmed_text();
     $event->{'subtitle'}=$eventDetails->look_down('_tag'=>'div','class'=>'first-subtitle')->as_trimmed_text().$eventDetails->look_down('_tag'=>'div','class'=>'second-subtitle')->as_trimmed_text();
 
     my $details=$eTree->look_down('_tag'=>'div','id'=>'top-info');
@@ -91,70 +90,56 @@ foreach my $eventLink (keys (%links)) {
 	year => "20".$startYear,
 	hour => $startHour // 0,
 	minute => $startMinute // 0,
-	time_zone => "Europe/Berlin"
+	#time_zone => "Europe/Berlin"
     );
 
-    if (($endDay) and ($endMonth) and ($endYear)) {
-	$event->{'ende'}=DateTime->new(
-	    day => $endDay,
-	    month => $endMonth,
-	    year => "20".$endYear,
-	    hour => $endHour // 0,
-	    minute => $endMinute // 0,
-	    time_zone => "Europe/Berlin"
-	);
-    }
-    else {
-	# If no end date is given assume the events at the same day as it starts
-	$event->{'ende'}=$event->{'beginn'}->clone();
+    $event->{'ende'}=$event->{'beginn'}->clone();
+
+    $event->{'ende'}->set_year("20".$endYear) if defined($endYear);
+    $event->{'ende'}->set_month($endMonth) if defined($endMonth);
+    $event->{'ende'}->set_day($endDay) if defined($endDay);
+    $event->{'ende'}->set_hour($endHour) if defined($endHour);
+    $event->{'ende'}->set_minute($endMinute) if defined($endMinute);
+
+    # If no end date is given and event crosses midnight, add a day to end time
+    unless (defined($endDay) and defined($endMonth) and defined($endYear)) {
+	if (DateTime->compare($event->{'beginn'},$event->{'ende'}) eq 1) {
+	    $event->{'ende'}->add(days=>1);
+	}
     }
 
-    # If a end time is given use it
-    if (defined($endHour)) {
-	$event->{'ende'}->set_hour($endHour);
-	$event->{'ende'}->set_minute($endMinute);
-    }
-    # else if a start time is given but no end time, assume the event takes 2 hours
-    elsif (defined($startHour)) {
+    # if a start time is given but no end time, assume the event takes 2 hours
+    if (defined($startHour) and not defined($endHour)) {
 	$event->{'ende'}->add(hours=>2);
     }
-    # If no times are given it's a full-day event
-    else {
+
+    # If no start time is given, it's a full-day event
+    if (not defined($startHour)) {
 	$event->{'fullday'}=1;
-    }
-    # If event crosses midnight add a day to ende
-    if (DateTime->compare($event->{'beginn'},$event->{'ende'}) eq 1) {
-	$event->{'ende'}->add(days=>1);
     }
 
     # Ort
-    my @o=split(/\s*\n/,
-	HTML::FormatText->new(lm=>0)->format_from_string(
-	    $details->look_down('_tag'=>'h3',sub{$_[0]->as_trimmed_text()=~/^Veranstaltungsort$/})->parent()->as_HTML()
-	)
-    );
+    my @o=split(/\s*\n/, $details->look_down('_tag'=>'h3',sub{$_[0]->as_trimmed_text()=~/^Veranstaltungsort$/})->parent()->format($formatter));
     shift(@o);	# first element is string "Veranstaltungsort"
     $event->{'ort'}=join(", ",@o);
 
     # Veranstalter
-    my @v=split(/\s*\n/,
-	HTML::FormatText->new(lm=>0)->format_from_string(
-	    $details->look_down('_tag'=>'h3',sub{$_[0]->as_trimmed_text()=~/^Veranstalter$/})->parent()->as_HTML()
-	)
-    );
+    my @v=split(/\s*\n/, $details->look_down('_tag'=>'h3',sub{$_[0]->as_trimmed_text()=~/^Veranstalter$/})->parent()->format($formatter));
     shift(@v);	# first element is string "Veranstalter"
     $event->{'veranstalter'}=join(", ",@v);
 
     # Beschreibung
     my @b;
     try {
-	my $text=$eventDetails->look_down('_tag'=>'div','id'=>'event-description')->as_trimmed_text();
+	my $text=$eventDetails->look_down('_tag'=>'div','id'=>'event-description')->format($formatter);
 	$text=~s/^\s*Beschreibung\s*//;
+	$text=~s/^[\\n\-\s]*//;
+	$text=~s/\\n\\n+/\n/g;
 	push(@b,$text);
     };
     try {
 	my @li=$eventDetails->look_down('_tag'=>'div','id'=>'event-additional')->look_down('_tag'=>'li');
-	push(@b,map { $_->as_trimmed_text() } @li);
+	push(@b,map { $_->format($formatter) } @li);
     };
     $event->{'description'}=join("\n\n",@b);
 
@@ -197,45 +182,11 @@ foreach my $event (@eventList) {
 	$tm[5] + 1900, $tm[4] + 1, $tm[3], $tm[2],
 	$tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
 
-    my ($startTime,$endTime);
-
-    if ($event->{'fullday'}) {
-	$startTime=sprintf("%04d%02d%02d",$event->{'beginn'}->year,$event->{'beginn'}->month,$event->{'beginn'}->day);
-	$endTime=sprintf("%04d%02d%02d",$event->{'ende'}->year,$event->{'ende'}->month,$event->{'ende'}->day),
-    }
-    else {
-	$startTime=DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'beginn'}->year,
-		month=>$event->{'beginn'}->month,
-		day=>$event->{'beginn'}->day,
-		hour=>$event->{'beginn'}->hour,
-		minute=>$event->{'beginn'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-	    )
-	);
-
-	$endTime=DateTime::Format::ICal->format_datetime(
-	    DateTime->new(
-		year=>$event->{'ende'}->year,
-		month=>$event->{'ende'}->month,
-		day=>$event->{'ende'}->day,
-		hour=>$event->{'ende'}->hour,
-		minute=>$event->{'ende'}->min,
-		second=>0,
-		#time_zone=>'Europe/Berlin'
-	    )
-	);
-    }
-
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
 	summary => $event->{'title'},
 	description => join("\n",$event->{'subtitle'},$event->{'description'}),
-	dtstart=>$startTime,
-	dtend=>$endTime,
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
 	#organizer=>"CN: ".$event->{'veranstalter'}//"",
@@ -245,6 +196,19 @@ foreach my $event (@eventList) {
 	categories=>$event->{'typ'},
 	url=>$event->{'link'},
     );
+
+    if (defined($event->{'fullday'})) {
+	$eventEntry->add_properties(
+	    dtstart=>[$event->{'beginn'}->ymd(''), {VALUE=>'DATE'}],
+	    dtend=>[$event->{'ende'}->ymd(''), {VALUE=>'DATE'}],
+	);
+    }
+    else {
+	$eventEntry->add_properties(
+	    dtstart=>DateTime::Format::ICal->format_datetime($event->{'beginn'}),
+	    dtend=>DateTime::Format::ICal->format_datetime($event->{'ende'}),
+	);
+    }
 
     $calendar->add_entry($eventEntry);
     $count++;
