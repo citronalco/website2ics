@@ -77,7 +77,7 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	    next;
 	};
 
-
+	#print "URL: ".$event->{'url'}."\n";
 	my $page=HTML::TreeBuilder->new();
 	$page->ignore_unknown(0);       # "article"-Tag wird sonst nicht erkannt
 	$page->parse_content($mech->content());
@@ -94,13 +94,11 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	my $now=DateTime->now();
 	my $jahr=$now->strftime("%Y");
 	my $monat=1+first_index { $_ eq lc($monatsname) } @monatsnamen;
-	$event->{'einlass'}=$datumFormat->parse_datetime($tag.".".$monat.".".$jahr." ".$stunde.":".$minute);
-	# wenn z.B. durch Jahreswechsel die so erstellte Einlasszeit zu weit in der Vergangenheit liegt: 1 Jahr dazuzuzählen
-	if ($event->{'einlass'} < $now->add(months => -1)) {
-	    $event->{'einlass'}=$event->{'einlass'}->add(years => 1);
+	$event->{'start'}=$datumFormat->parse_datetime($tag.".".$monat.".".$jahr." ".$stunde.":".$minute);
+	# wenn z.B. durch Jahreswechsel die so erstellte Einlasszeit zu weit in der Vergangenheit liegt: 1 Jahr dazuzählen
+	if ($event->{'start'} < $now->add(months => -1)) {
+	    $event->{'start'}=$event->{'einlass'}->add(years => 1);
 	}
-	$event->{'beginn'}=$event->{'einlass'}->clone();
-
 	@{$event->{'kategorien'}} = split /,\s*/, $kategorien;
 
 	### Fußzeile: Tickets
@@ -139,54 +137,33 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	    $event->{'ak'}=$1;
 	}
 
-	if ($orga=~/Einlass:?\s+(\d+)[:\.](\d+)/) {
-	    $event->{'einlass'}->set(hour=>$1, minute=>$2);
+	if (my ($h,$m)=$orga=~/Einlass:?\s+(\d{1,2})[:\.]?(\d{0,2})/) {
+	    $event->{'einlass'}=$event->{'start'}->clone();
+	    $event->{'einlass'}->set(hour=>$h, minute=>($m or "0"));
 	}
-	elsif ($orga=~/(\d+)[:\.](\d+) (?:Uhr )?Einlass/) {
-	    $event->{'einlass'}->set(hour=>$1, minute=>$2);
-	}
-	elsif ($orga=~/Einlass:?\s+(\d+)[:\.]/) {	# Minuten "00" wird gelegenlich als "oo" geschrieben...
-	    $event->{'einlass'}->set(hour=>$1, minute=>0);
-	}
-	elsif ($orga=~/(\d+)[:\.].{2} Einlass/) {	# Minuten "00" wird gelegenlich als "oo" geschrieben, und "Einlass" danach
-	    $event->{'einlass'}->set(hour=>$1, minute=>0);
-	}
-
-	if ($orga=~/Beginn:?\s+(\d+)[:\.](\d+)/) {
-	    $event->{'beginn'}->set(hour=>$1, minute=>$2);
-	}
-	elsif ($orga=~/(\d+)[:\.](\d+) (?:Uhr )?Beginn/) {
-	    $event->{'beginn'}->set(hour=>$1, minute=>$2);
-	}
-	elsif ($orga=~/Beginn:?\s+(\d+)[:\.]/) {	# Minuten "00" wird gelegenlich als "oo" geschrieben...
-	    $event->{'beginn'}->set(hour=>$1, minute=>0);
-	}
-	elsif ($orga=~/(\d+)[:\.].{2} Beginn/) {	# Minuten "00" wird gelegenlich als "oo" geschrieben, und "Beginn" danach
-	    $event->{'beginn'}->set(hour=>$1, minute=>0);
-	}
-	elsif ($orga=~/Beginn:? (\d+) Uhr/) {	# Minuten werden gelegentlich weggelassen
-	    $event->{'beginn'}->set(hour=>$1, minute=>0);
+	if (my ($h,$m)=$orga=~/Beginn:?\s+(\d{1,2})[:\.]?(\d{0,2})/) {
+	    $event->{'beginn'}=$event->{'start'}->clone();
+	    $event->{'beginn'}->set(hour=>$h, minute=>($m or "0"));
 	}
 
 	if (!$event->{'einlass'} and !$event->{'beginn'}) {
 	    # 15 – 22 Uhr, 15-22:14 Uhr, 14:15 bis 16 Uhr,... - aus HTML kratzen
 	    if ($text_html=~/(\d+):?(\d{2})?\s*(?:bis|[\-–]|&ndash;|&dash;)\s*(\d+):?(\d{2})?\s+Uhr/i) {
-		$event->{'beginn'}->set(hour=>$1, minute=>($2//"00"));
-		$event->{'ende'}->set(hour=>$3, minute=>($4//"00"));
+		$event->{'beginn'}=$event->{'start'}->clone();
+		$event->{'beginn'}->set(hour=>$1, minute=>($2//"0"));
+		$event->{'ende'}->set(hour=>$3, minute=>($4//"0"));
 	    }
 	}
 
 	# Wenn überhaupt keine Zeitangabe gefunden werden konnte: Als Ganztagesevent eintragen
 	if (!$event->{'einlass'} and !$event->{'beginn'}) {
-	    #die($event->{'url'});
 	    $event->{'fullday'}=1;
+	    $event->{'ende'}=$event->{'start'}->clone();
 	}
 
 	# Fehlende Zeitangaben ergänzen
-	$event->{'einlass'}=$event->{'beginn'} unless ($event->{'einlass'});
-	$event->{'beginn'}=$event->{'einlass'} unless ($event->{'beginn'});
 	unless ($event->{'ende'}) {
-	    $event->{'ende'}=$event->{'beginn'}->clone();
+	    $event->{'ende'}=($event->{'beginn'} or $event->{'einlass'})->clone();
 	    $event->{'ende'}->add(minutes=>$defaultDauer) unless ($event->{'fullday'});
 	}
 
@@ -262,8 +239,6 @@ foreach my $event (@eventList) {
 	summary => $event->{'titel'},
 	description => $description,
 	categories => join(", ",@{$event->{'kategorien'}}),
-	dtstart => dt2icaldt($event->{'beginn'}),
-	dtend => dt2icaldt($event->{'ende'}),
 	dtstamp => $dstamp,
 	class => "PUBLIC",
 	organizer => "MAILTO:foobar",
@@ -272,12 +247,15 @@ foreach my $event (@eventList) {
     );
 
     if ($event->{'fullday'}) {
-
+	$eventEntry->add_properties(
+	    dtstart => dt2icaldt_fullday($event->{'beginn'} or $event->{'einlass'} or $event->{'start'}),
+	    dtend => dt2icaldt_fullday($event->{'ende'}),
+	);
     }
     else {
 	$eventEntry->add_properties(
-	    dtstart => dt2icaldt_fullday($event->{'beginn'}),
-	    dtend => dt2icaldt_fullday($event->{'ende'}),
+	    dtstart => dt2icaldt($event->{'beginn'} or $event->{'einlass'} or $event->{'start'}),
+	    dtend => dt2icaldt($event->{'ende'}),
 	);
     }
 
