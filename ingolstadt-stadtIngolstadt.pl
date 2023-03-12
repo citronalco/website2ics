@@ -152,19 +152,27 @@ foreach my $eventLink (keys (%links)) {
     $event->{'veranstalter'}=join(", ",@v);
 
     # Beschreibung
-    my @b;
+    my @d;
     try {
 	my $text=$eventDetails->look_down('_tag'=>'div','id'=>'event-description')->format($formatter);
 	$text=~s/^\s*Beschreibung\s*//;
 	$text=~s/^[\\n\-\s]*//;
 	$text=~s/\\n\\n+/\n/g;
-	push(@b,$text);
+	push(@d,$text);
     };
+
     try {
 	my @li=$eventDetails->look_down('_tag'=>'div','id'=>'event-additional')->look_down('_tag'=>'li');
-	push(@b,map { $_->format($formatter) } @li);
+	if (scalar(@li)>0) {
+	    my @detailtexts;
+	    foreach my $i (@li) {
+		my $detailtext=$i->format($formatter);
+		push(@detailtexts,$detailtext);
+	    }
+	    push(@d, "Details:\n".join("\n", @detailtexts));
+	}
     };
-    $event->{'description'}=join("\n\n",@b);
+    $event->{'description'}=join("\n",@d);
 
     # Kategorien
     try {
