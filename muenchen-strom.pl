@@ -153,15 +153,15 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/${url}event\//)) {
 
 	# "Einlass: HH.MM Uhr / Beginn: HH.MM Uhr"
 	# "Einlass & Beginn: HH.MM Uhr"
-	if ($uhrzeit=~/ (\d{1,2})[\.:](\d{1,2}) .+(\d{1,2})[\.:](\d{1,2}) Uhr/i) {
+	if ($uhrzeit=~/ (\d{1,2})[\.:](\d{1,2}) .*?(\d{1,2})[\.:](\d{1,2}) Uhr/i) {
 	    $event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.".".$2);
 	    $event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$3.".".$4);
 	}
 	else {
-	    if ($uhrzeit=~/Einlass.*(\d{1,2})[\.:](\d{1,2}) Uhr/i) {
+	    if ($uhrzeit=~/Einlass.*?(\d{1,2})[\.:](\d{1,2}) Uhr/i) {
 		$event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.".".$2);
 	    }
-	    if ($uhrzeit=~/Beginn.*(\d{1,2})[\.:](\d{1,2}) Uhr/i) {
+	    if ($uhrzeit=~/Beginn.*?(\d{1,2})[\.:](\d{1,2}) Uhr/i) {
 		$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$1.".".$2);
 	    }
 	}
