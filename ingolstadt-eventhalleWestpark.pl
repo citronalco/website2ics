@@ -76,7 +76,7 @@ foreach my $eventLink (@eventLinks) {
     # Untertitel
     $event->{'subtitle'}=$root->look_down('id'=>'eventSubtitle')->as_trimmed_text;
     # -> Titel
-    $event->{'name'}=join(": ",$event->{'title'},$event->{'subtitle'});
+    $event->{'name'}=join(": ",grep $_,$event->{'title'},$event->{'subtitle'});
 
     # Datum
     my $datum=($root->look_down('id'=>'eventDate'))->as_trimmed_text;
