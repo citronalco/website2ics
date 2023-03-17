@@ -139,11 +139,23 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 
 	if (my ($h,$m)=$orga=~/Einlass:?\s+(\d{1,2})[:\.]?(\d{0,2})/) {
 	    $event->{'einlass'}=$event->{'start'}->clone();
-	    $event->{'einlass'}->set(hour=>$h, minute=>($m or "0"));
+	    if ($h eq "24") {
+		$event->{'einlass'}->set(hour=>0, minute=>$m);
+		$event->{'einlass'}->add(days=>1);
+	    }
+	    else {
+		$event->{'einlass'}->set(hour=>$h, minute=>($m or "0"));
+	    }
 	}
 	if (my ($h,$m)=$orga=~/Beginn:?\s+(\d{1,2})[:\.]?(\d{0,2})/) {
 	    $event->{'beginn'}=$event->{'start'}->clone();
-	    $event->{'beginn'}->set(hour=>$h, minute=>($m or "0"));
+	    if ($h eq "24") {
+		$event->{'beginn'}->set(hour=>0, minute=>$m);
+		$event->{'beginn'}->add(days=>1);
+	    }
+	    else {
+		$event->{'beginn'}->set(hour=>$h, minute=>($m or "0"));
+	    }
 	}
 
 	if (!$event->{'einlass'} and !$event->{'beginn'}) {
