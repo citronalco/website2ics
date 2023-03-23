@@ -112,8 +112,8 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 	$event->{'beginn'}->set(day=>$1,month=>$2);
 	#$event->{'ende'}->set(day=>$1,month=>$2);
     }
-    # "Di 25.08.22"
-    elsif ($datum=~/\w{2}(\d{2})\.(\d{2})(\d{2})/) {
+    # "Di25.08.22"
+    elsif ($datum=~/^\w{2}(\d{2})\.(\d{2})(\d{2})/) {
 	$event->{'beginn'}->set(day=>$1,month=>$2,year=>"20".$3);
 	#$event->{'ende'}->set(day=>$1,month=>$2,year="20".$3);
     }
@@ -121,6 +121,11 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     elsif ($datum=~/^(\d+)\.(?:\/\d+\.)+(\d+)\.$/) {
 	$event->{'beginn'}->set(day=>$1,month=>$2);
 	#$event->{'ende'}->set(day=>$1,month=>$2);
+    }
+    # "25.08.22"
+    elsif ($datum=~/^(\d{2})\.(\d{2})\.(\d{2})/) {
+	$event->{'beginn'}->set(day=>$1,month=>$2,year=>"20".$3);
+	#$event->{'ende'}->set(day=>$1,month=>$2,year="20".$3);
     }
 
     # "Montag ab 12 Uhr geöffnet" oder: "ab 12 Uhr" (wenn "heute" oder "morgen")  -> Biergarten, usw., keine echte Verantstaltung, überspringen
