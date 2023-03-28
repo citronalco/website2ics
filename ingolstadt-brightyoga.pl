@@ -9,6 +9,7 @@ use HTML::TreeBuilder;
 
 use DateTime::Format::Strptime;
 use DateTime::Format::ICal;
+use DateTime::Format::ISO8601;
 use Data::ICal;
 use Data::ICal::Entry::Event;
 use Data::ICal::Entry::TimeZone;
@@ -70,12 +71,15 @@ foreach my $u (@urls) {
 
 
     foreach my $column ($root->look_down('_tag'=>'div','class'=>'mptt-column')) {
-	# Wochentag
-	my $day=$column->look_down('class'=>'mptt-column-title')->as_trimmed_text;
+	# "Wochentag"
+	#my $day=$column->look_down('class'=>'mptt-column-title')->as_trimmed_text;
+	#my $date=$today->clone;
+	#my $dow=first_index { $_ eq lc($day) } @dayNames;
+	#$date->add(days=>($dow - $date->day_of_week) %7);
 
-	my $date=$today->clone;
-	my $dow=first_index { $_ eq lc($day) } @dayNames;
-	$date->add(days=>($dow - $date->day_of_week) %7);
+	# "Wochentag (DD.MM.YYYY)
+	my $dmy=$column->look_down('class'=>'mptt-column-title')->look_down('_tag'=>'time')->attr('datetime');
+	my $date=DateTime::Format::ISO8601->parse_datetime($dmy);
 
 	foreach my $entry ($column->look_down('class'=>'mptt-list-event')) {
 	    my $event;
