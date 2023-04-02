@@ -92,7 +92,14 @@ foreach my $eventLink (@eventLinks) {
 	$event->{'beginn'}=$datumFormat->parse_datetime($datum." ".$beginn_h.".".$beginn_m);
     };
     # Events ohne Uhrzeit sind abgesagte Events
-    next unless ($event->{'einlass'});
+    unless ($event->{'einlass'}) {
+	if ($mech->content=~/abgesagt/i) {
+	    next;
+	}
+	else {
+	    die("Keine Startzeit: ".$event->{'url'});
+	}
+    }
 
     # Ende=Beginn+$defaultDauer
     $event->{'ende'}=$event->{'beginn'}->clone();
