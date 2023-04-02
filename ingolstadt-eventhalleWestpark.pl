@@ -84,10 +84,12 @@ foreach my $eventLink (@eventLinks) {
     try {
 	# Einlass
 	my $einlass=($root->look_down('id'=>'eventStarttime'))->as_trimmed_text;
-	$event->{'einlass'}=$datumFormat->parse_datetime($datum." ".$einlass);
+	my ($einlass_h,$einlass_m)=$einlass=~/(\d{1,2})[\.:](\d{1,2})/;
+	$event->{'einlass'}=$datumFormat->parse_datetime($datum." ".$einlass_h.".".$einlass_m);
 	# Beginn
 	my $beginn=($root->look_down('id'=>'eventStagetime'))->as_trimmed_text;
-	$event->{'beginn'}=$datumFormat->parse_datetime($datum." ".$beginn);
+	my ($beginn_h,$beginn_m)=$beginn=~/(\d{1,2})[\.:](\d{1,2})/;
+	$event->{'beginn'}=$datumFormat->parse_datetime($datum." ".$beginn_h.".".$beginn_m);
     };
     # Events ohne Uhrzeit sind abgesagte Events
     next unless ($event->{'einlass'});
