@@ -93,7 +93,7 @@ foreach my $eventLink (@eventLinks) {
     };
     # Events ohne Uhrzeit sind abgesagte Events
     unless ($event->{'einlass'}) {
-	if ($mech->content=~/abgesagt/i) {
+	if ($mech->content=~/(abgesagt)|(verlegt)/i) {
 	    next;
 	}
 	else {
