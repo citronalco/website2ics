@@ -97,7 +97,7 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	$event->{'start'}=$datumFormat->parse_datetime($tag.".".$monat.".".$jahr." ".$stunde.":".$minute);
 	# wenn z.B. durch Jahreswechsel die so erstellte Einlasszeit zu weit in der Vergangenheit liegt: 1 Jahr dazuzählen
 	if ($event->{'start'} < $now->add(months => -1)) {
-	    $event->{'start'}=$event->{'einlass'}->add(years => 1);
+	    $event->{'start'}->add(years => 1);
 	}
 	@{$event->{'kategorien'}} = split /,\s*/, $kategorien;
 
