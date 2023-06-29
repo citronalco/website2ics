@@ -88,7 +88,6 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     my $now=DateTime->now();
 
     $event->{'beginn'}=$now->clone();
-    #$event->{'ende'}=$now->clone();
     $event->{'fullday'}=1;
 
     my $datum=$root->look_down('_tag'=>'div','class'=>'entry-data side left')->as_trimmed_text;
@@ -99,37 +98,38 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     # "Morgen"
     elsif ($datum=~/morgen/i) {
 	$event->{'beginn'}->add(days=>1);
-	#$event->{'ende'}->add(days=>1);
     }
     # "25.03&26.03."
-    elsif ($datum=~/^\s*(\d{2})\.(\d{2})\&(\d{2})\.(\d{2})/i) {
+    elsif ($datum=~/^\s*(\d{2})\.(\d{2})\&(\d{2})\.(\d{2})\.$/i) {
 	$event->{'beginn'}->set(day=>$1,month=>$2);
-	#$event->{'ende'}->set(day=>$1,month=>$3);
+    }
+    # "25.03&26.03"
+    elsif ($datum=~/^\s*(\d{2})\.(\d{2})\&(\d{2})\.(\d{2})$/i) {
+	$event->{'beginn'}->set(day=>$1,month=>$2);
     }
     # "25. bis 27.08."
-    elsif ($datum=~/^\s*(\d{2})\.?bis(\d{2})\.(\d{2})/i) {
+    elsif ($datum=~/^\s*(\d{2})\.?bis(\d{2})\.(\d{2})$/i) {
 	$event->{'beginn'}->set(day=>$1,month=>$3);
-	#$event->{'ende'}->set(day=>$1,month=>$3);
     }
     # "25.08. bis 03.09."
-    elsif ($datum=~/^\s*(\d{2})\.(\d{2})\.?bis(\d{2})\.(\d{2})/i) {
+    elsif ($datum=~/^\s*(\d{2})\.(\d{2})\.?bis(\d{2})\.(\d{2})$/i) {
 	$event->{'beginn'}->set(day=>$1,month=>$2);
-	#$event->{'ende'}->set(day=>$1,month=>$2);
     }
     # "Di25.08.22"
-    elsif ($datum=~/^\w{2}(\d{2})\.(\d{2})(\d{2})/) {
+    elsif ($datum=~/^[A-Z][a-z](\d{2})\.(\d{2})\.(\d{2})$/) {
 	$event->{'beginn'}->set(day=>$1,month=>$2,year=>"20".$3);
-	#$event->{'ende'}->set(day=>$1,month=>$2,year="20".$3);
+    }
+    # "Di25.0822"
+    elsif ($datum=~/^[A-Z][a-z](\d{2})\.(\d{2})(\d{2})$/) {
+	$event->{'beginn'}->set(day=>$1,month=>$2,year=>"20".$3);
     }
     # "15./17./18./19.05."
     elsif ($datum=~/^(\d+)\.(?:\/\d+\.)+(\d+)\.$/) {
 	$event->{'beginn'}->set(day=>$1,month=>$2);
-	#$event->{'ende'}->set(day=>$1,month=>$2);
     }
     # "25.08.22"
-    elsif ($datum=~/^(\d{2})\.(\d{2})\.(\d{2})/) {
+    elsif ($datum=~/^(\d{2})\.(\d{2})\.(\d{2})$/) {
 	$event->{'beginn'}->set(day=>$1,month=>$2,year=>"20".$3);
-	#$event->{'ende'}->set(day=>$1,month=>$2,year="20".$3);
     }
 
     # "Montag ab 12 Uhr geöffnet" oder: "ab 12 Uhr" (wenn "heute" oder "morgen")  -> Biergarten, usw., keine echte Verantstaltung, überspringen
