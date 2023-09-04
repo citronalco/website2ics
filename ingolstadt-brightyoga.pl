@@ -70,18 +70,18 @@ foreach my $u (@urls) {
     $root->parse_content($mech->content());
 
 
-    foreach my $column ($root->look_down('_tag'=>'div','class'=>'mptt-column')) {
+    foreach my $column ($root->look_down('_tag'=>'div','class'=>'cbs-timetable-column')) {
 	# "Wochentag"
-	#my $day=$column->look_down('class'=>'mptt-column-title')->as_trimmed_text;
+	#my $day=$column->look_down('class'=>'cbs-timetable-column-title')->as_trimmed_text;
 	#my $date=$today->clone;
 	#my $dow=first_index { $_ eq lc($day) } @dayNames;
 	#$date->add(days=>($dow - $date->day_of_week) %7);
 
 	# "Wochentag (DD.MM.YYYY)
-	my $dmy=$column->look_down('class'=>'mptt-column-title')->look_down('_tag'=>'time')->attr('datetime');
+	my $dmy=$column->look_down('class'=>'cbs-timetable-column')->look_down('_tag'=>'time')->attr('datetime');
 	my $date=DateTime::Format::ISO8601->parse_datetime($dmy);
 
-	foreach my $entry ($column->look_down('class'=>'mptt-list-event')) {
+	foreach my $entry ($column->look_down('_tag'=>'li')) {
 	    my $event;
 
 	    # Beginn
@@ -101,10 +101,10 @@ foreach my $u (@urls) {
 	    $event->{'end'}->set_second(0);
 
 	    # Titel
-	    $event->{'title'}=$entry->look_down('class'=>'mptt-event-title')->as_trimmed_text;
+	    $event->{'title'}=$entry->look_down('_tag'=>'a')->attr('title');
 
 	    # Anmeldelink
-	    $event->{'url'}=$entry->look_down('class'=>'mptt-event-link')->attr('href');
+	    $event->{'url'}=$entry->look_down('_tag'=>'a')->attr('href');
 
 	    # Freie Plätze
 	    #$event->{'emptyseats'}=$entry->look_down('class'=>'event-attendance')->as_trimmed_text;
@@ -118,9 +118,11 @@ foreach my $u (@urls) {
 	    # Spalte mit passendem Datum suchen
 	    my @spalten=$loginRoot->look_down('_tag'=>'div','class'=>'slide');
 	    foreach my $spalte (@spalten) {
+
 		# "MONTAG, 15.3.2022"
 		my $datestring=$spalte->look_down('_tag'=>'h3')->as_trimmed_text;
 		$datestring=~s/(^\D+,\s+)//;
+
 		my $columndate=$datumFormat->parse_datetime($datestring." 00:00");
 		if ($event->{'start'}->ymd eq $columndate->ymd) {
 		    try {
@@ -138,7 +140,7 @@ foreach my $u (@urls) {
 		$event->{'subtitle'}=$entry->look_down('class'=>'event-subtitle')->as_trimmed_text;
 	    };
 	    # User
-	    $event->{'trainer'}=$entry->look_down('class'=>'event-user')->as_trimmed_text;
+	    $event->{'trainer'}=$entry->look_down('class'=>'trainer')->as_trimmed_text;
 
 	    # Stream oder Studio?
 	    $event->{'location'}=$u->{'ort'};
