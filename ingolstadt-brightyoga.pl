@@ -33,6 +33,8 @@ my @urls=(
 
 my $beschreibungsUrl="https://www.brightyoga.de/termine/kursbeschreibungen/";
 
+my $ajaxUrl="https://www.brightyoga.de/wp-admin/admin-ajax.php";
+
 
 my @dayNames=("sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag");
 my $today=DateTime->now('time_zone'=>'Europe/Berlin');
@@ -60,16 +62,28 @@ sub dt2icaldt_fullday {
 
 my $mech=WWW::Mechanize->new();
 
+
+
+
+
+
 my @eventList;
 foreach my $u (@urls) {
     $mech->get($u->{'url'}) or die($!);
 
-    # alle Tage durchgehen
     my $root=HTML::TreeBuilder->new();
     $root->ignore_unknown(0);       # "time"-Tag wird sonst nicht erkannt
     $root->parse_content($mech->content());
 
+    # "Category" rausfinden
+    my $category=$root->look_down('_tag'=>'div', class=>'cbs-pagination')->look_down('_tag'=>'a')->attr('data-category');
 
+    # Kalenderseite holen
+    $mech->get($ajaxUrl."?action=cbs_action_week&category=".$category);
+
+    # Kalenderseite auswerten
+    $root->parse_content($mech->content());
+    # alle Tage durchgehen
     foreach my $column ($root->look_down('_tag'=>'div','class'=>'cbs-timetable-column')) {
 	# "Wochentag"
 	#my $day=$column->look_down('class'=>'cbs-timetable-column-title')->as_trimmed_text;
