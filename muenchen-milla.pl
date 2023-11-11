@@ -66,7 +66,6 @@ my @eventList;
 # Monatsweise durchgehen um "Featured" zu überspringen
 foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events')) {
     foreach my $eventItem ($monthSection->look_down('_tag'=>'div','class'=>'event__title')) {
-
 	my $event;
 	# Unterseite aufrufen
 	try {
@@ -77,7 +76,6 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	    next;
 	};
 
-	#print "URL: ".$event->{'url'}."\n";
 	my $page=HTML::TreeBuilder->new();
 	$page->ignore_unknown(0);       # "article"-Tag wird sonst nicht erkannt
 	$page->parse_content($mech->content());
@@ -95,6 +93,15 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	my $jahr=$now->strftime("%Y");
 	my $monat=1+first_index { $_ eq lc($monatsname) } @monatsnamen;
 	$event->{'start'}=$datumFormat->parse_datetime($tag.".".$monat.".".$jahr." ".$stunde.":".$minute);
+
+	# Datum testen: Wenn's z.B. den 29.2. nicht gibt, ein Jahr dazu zählen
+	try {
+	    my $dummy=$event->{'start'}->strftime("%Y-%m-%d");
+	}
+	catch {
+	    $event->{'start'}=$datumFormat->parse_datetime($tag.".".$monat.".".($jahr+1)." ".$stunde.":".$minute);
+	};
+
 	# wenn z.B. durch Jahreswechsel die so erstellte Einlasszeit zu weit in der Vergangenheit liegt: 1 Jahr dazuzählen
 	if ($event->{'start'} < $now->add(months => -1)) {
 	    $event->{'start'}->add(years => 1);
