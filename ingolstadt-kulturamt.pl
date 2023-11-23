@@ -32,8 +32,14 @@ for (my $month=0;$month<$MAXMONTHS;$month++) {
 
     $mech->get($url) or die($!);
 
-    my $kaCalendar=Data::ICal->new(data=>$mech->content());
+    # Data::ICal::Entry does not understand REFRESH-INTERVAL, so filter that out
+    my @filtered;
+    my @lines=split /\n/, $mech->content();
+    foreach (@lines) {
+	push(@filtered,$_) unless $_=~/^refresh-interval/i;
+    }
 
+    my $kaCalendar=Data::ICal->new(data=>join("\n", @filtered));
     # if there are no events this month, no ical without entries, but unfortunately an empty document is returned
     next unless $kaCalendar;
 
