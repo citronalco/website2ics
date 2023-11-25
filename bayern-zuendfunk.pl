@@ -17,9 +17,10 @@ use Data::ICal::Entry::TimeZone::Standard;
 
 use Time::HiRes;
 
+use Try::Tiny;
+
 use utf8;
 use warnings;
-#use Data::Dumper;
 
 my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht im Programm, wird aber für Kalendereintrag gebraucht)
 
@@ -71,29 +72,16 @@ foreach my $eventPage ($mech->find_all_links(class_regex=>qr/link_article conten
     # Entferne "Zündfunk präsentiert" am Anfang
     $event->{'titel'}=~s/^Zündfunk präsentiert:?\s+//i;
 
-    # Beginn
-    my $datumZeit=($tree->look_down('_tag'=>'p','class'=>'calendar_time'))->as_trimmed_text;
-    $event->{'beginn'}=$datumZeitFormat->parse_datetime($datumZeit);
-
-    # Ende=Beginn+3h
-    $event->{'ende'}=$event->{'beginn'}->clone();
-    $event->{'ende'}->add(minutes=>$defaultDauer);
-
-    # Ort
-    $event->{'ort'}=($tree->look_down('_tag'=>'span','class'=>'calendar_title'))->as_trimmed_text;
-    # Entferne Doppelpunkt am Ende
-    $event->{'ort'}=~s/:$//;
-
     # Kurze Beschreibung
     my $kurztext=$tree->look_down('_tag'=>'meta','name'=>'description')->attr('content');
-
-    # Lange Beschreibungen
-    my @langtexte=map{ $_->as_trimmed_text } $tree->look_down('_tag'=>'p','class'=>'copytext');
-    @langtexte=grep($_,@langtexte);
 
     # Kalenderbeschreibungen
     my @calendartexte=map{ $_->as_trimmed_text } $tree->look_down('_tag'=>'p','class'=>'calendar_text');
     @calendartexte=grep($_,@calendartexte);
+
+    # Lange Beschreibungen
+    my @langtexte=map{ $_->as_trimmed_text } $tree->look_down('_tag'=>'p','class'=>'copytext');
+    @langtexte=grep($_,@langtexte);
 
     # Alle Beschreibungen zusammenfügen
     $event->{'beschreibung'}=join(
@@ -104,7 +92,26 @@ foreach my $eventPage ($mech->find_all_links(class_regex=>qr/link_article conten
     # Link
     $event->{'url'}=$mech->uri()->as_string;
 
-    push(@events,$event);
+    # Gelegentlich gibt's mehr als einen Termin:
+    foreach my $detail_calendar_item ($tree->look_down('_tag'=>'div','class'=>qr/detail_calendar_item/)) {
+
+	# Beginn
+	my $datumZeit=($tree->look_down('_tag'=>'p','class'=>'calendar_time'))->as_trimmed_text;
+	$event->{'beginn'}=$datumZeitFormat->parse_datetime($datumZeit);
+
+	# Ende=Beginn+3h
+	$event->{'ende'}=$event->{'beginn'}->clone();
+	$event->{'ende'}->add(minutes=>$defaultDauer);
+
+	# Ort
+	try {
+	    $event->{'ort'}=($tree->look_down('_tag'=>'span','class'=>'calendar_title'))->as_trimmed_text;
+	    # Entferne Doppelpunkt am Ende
+	    $event->{'ort'}=~s/:$//;
+	};
+
+	push(@events,$event);
+    }
 }
 
 # Create Datestamp for dtstamp
