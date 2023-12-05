@@ -91,9 +91,11 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     $event->{'fullday'}=1;
 
     my $datum=$root->look_down('_tag'=>'div','class'=>'entry-data side left')->as_trimmed_text;
+    # Abgesagt
+    next if ($datum=~/Ersatzterminfolgt/);
     # "Heute"
     if ($datum=~/heute/i) {
-	# passt schon
+	# "Beginn" passt schon
     }
     # "Morgen"
     elsif ($datum=~/morgen/i) {
