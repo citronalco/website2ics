@@ -40,35 +40,42 @@ for (my $month=0;$month<$MAXMONTHS;$month++) {
     $mech->get($url) or die($!);
     #print $url."\n";
 
-    my $kap94calendar=Data::ICal->new(data=>$mech->content());
-    foreach my $entry (@{$kap94calendar->entries}) {
+    # Data::ICal::Entry does not understand REFRESH-INTERVAL, so filter that out
+    my @filtered;
+    my @lines=split /\n/, $mech->content();
+    foreach (@lines) {
+	push(@filtered,$_) unless $_=~/^refresh-interval/i;
+    }
 
-	# skip entries without data
-	unless (($entry->property('summary')) and ($entry->property('url')) and ($entry->property('description'))) {
-	    #print Dumper $entry;
-	    #exit;
-	    next;
-	}
+    # TODO/FIXME: Why does kap94.de return empty pages instead of an empty calendar?
+    unless (scalar(@lines) == 0) {
 
-	# skip simple "belegt" events
-	next if ($entry->property('summary')->[0]->value=~/^belegt$/);
+	my $kap94calendar=Data::ICal->new(data=>join("\n", @filtered));
+	foreach my $entry (@{$kap94calendar->entries}) {
 
-	my $url=$entry->property('url')->[0]->value;
+	    # skip entries without data
+	    next unless (($entry->property('summary')) and ($entry->property('url')) and ($entry->property('description')));
+
+	    # skip simple "belegt" events
+	    next if ($entry->property('summary')->[0]->value=~/^belegt$/);
+
+	    my $url=$entry->property('url')->[0]->value;
 	
-	my $description=$entry->property('description')->[0]->value;
-	# if no description but event's url given, get description from url
-	if ((!$description) and ($url)) {
-	    try {
-		$mech->get($url);
-		my $tree=HTML::TreeBuilder->new_from_content($mech->content());
-		$entry->add_properties(
-		    'description'=>join("\n", map { $_->as_trimmed_text(extra_chars=>'\xA0'); } $tree->look_down('_tag'=>'div','id'=>'event-single-content')->find('p'))
-		);
-	    };
+	    my $description=$entry->property('description')->[0]->value;
+	    # if no description but event's url given, get description from url
+	    if ((!$description) and ($url)) {
+		try {
+		    $mech->get($url);
+		    my $tree=HTML::TreeBuilder->new_from_content($mech->content());
+		    $entry->add_properties(
+			'description'=>join("\n", map { $_->as_trimmed_text(extra_chars=>'\xA0'); } $tree->look_down('_tag'=>'div','id'=>'event-single-content')->find('p'))
+		    );
+		};
+	    }
+	    # fix location
+	    $entry->add_properties('location'=>"KAP94, Jahnstr. 1a, 85049 Ingolstadt");
+	    $calendar->add_entry($entry);
 	}
-        # fix location
-	$entry->add_properties('location'=>"KAP94, Jahnstr. 1a, 85049 Ingolstadt");
-	$calendar->add_entry($entry);
     }
     $date->add(months=>1);
 }
