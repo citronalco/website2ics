@@ -62,11 +62,6 @@ sub dt2icaldt_fullday {
 
 my $mech=WWW::Mechanize->new();
 
-
-
-
-
-
 my @eventList;
 foreach my $u (@urls) {
     $mech->get($u->{'url'}) or die($!);
@@ -244,6 +239,6 @@ foreach my $event (@eventList) {
     $count++;
 }
 
-die("Keine Einträge") if ($count==0);
+die("Keine Einträge") if (($count==0) and not (($today->month==12 and $today->day>20) or ($today->month==1 and $today->day<10)));
 
 print $calendar->as_string;
