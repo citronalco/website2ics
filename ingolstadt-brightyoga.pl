@@ -149,7 +149,7 @@ foreach my $u (@urls) {
 		$event->{'subtitle'}=$entry->look_down('class'=>'event-subtitle')->as_trimmed_text;
 	    };
 	    # User
-	    $event->{'trainer'}=$entry->look_down('class'=>'trainer')->as_trimmed_text;
+	    $event->{'trainer'}=$entry->look_down('class'=>qr/trainer.*/)->as_trimmed_text;
 
 	    # Stream oder Studio?
 	    $event->{'location'}=$u->{'ort'};
