@@ -97,6 +97,8 @@ foreach my $eventLink (keys (%links)) {
     my $eventDetails=$eTree->look_down('_tag'=>'div','id'=>'event-details');
 
     $event->{'title'}=$eventDetails->find_by_tag_name('h1')->as_trimmed_text();
+    next if $event->{'title'}=~/Diese Veranstaltung liegt in der Vergangenheit/;
+
     $event->{'subtitle'}=$eventDetails->look_down('_tag'=>'div','class'=>'first-subtitle')->as_trimmed_text().$eventDetails->look_down('_tag'=>'div','class'=>'second-subtitle')->as_trimmed_text();
 
     my $details=$eTree->look_down('_tag'=>'div','id'=>'top-info');
