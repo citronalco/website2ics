@@ -83,6 +83,9 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 
     my $root=HTML::TreeBuilder->new_from_content($mech->content())->look_down('id'=>'content');
 
+    # Leere Seiten überspringen
+    next unless ($mech->content=~/body/);
+
     # Datum - üblicherweise fehlt das Jahr
     # Bei mehrtägigen Veranstaltungen: Nur den ersten angezeigten Tag nehmen, Folgetage haben je eigene Webseiten
     my $now=DateTime->now();
