@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # 2018 geierb@geierb.de
-# CC-BY-SA
+# AGPLv3
 
 use strict;
 use WWW::Mechanize;

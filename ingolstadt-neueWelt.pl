@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # 2024 geierb@geierb.de
-# GPLv3
+# AGPLv3
 
 use strict;
 use WWW::Mechanize;
