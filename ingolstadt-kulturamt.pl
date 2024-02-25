@@ -40,11 +40,21 @@ for (my $month=0;$month<$MAXMONTHS;$month++) {
     }
 
     my $kaCalendar=Data::ICal->new(data=>join("\n", @filtered));
-    # if there are no events this month, no ical without entries, but unfortunately an empty document is returned
+    # if there are no events this month, no ical without entries but unfortunately an empty document is returned
     next unless $kaCalendar;
 
     foreach my $entry (@{$kaCalendar->entries}) {
 	$calendar->add_entry($entry);
+
+	# Add URL to DESCRIPTION
+	my ($url, $description);
+	if (exists($entry->properties->{'url'})) {
+	    $url=$entry->properties->{'url'}->[0]->value;
+	    if (exists($entry->properties->{'description'})) {
+		$description=$entry->properties->{'description'}->[0]->value;
+	    }
+	    $entry->add_property(description => join("\n", ($description, $url)));
+	}
     }
     $date->add(months=>1);
 }
