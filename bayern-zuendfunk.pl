@@ -93,6 +93,7 @@ foreach my $eventPage ($mech->find_all_links(class_regex=>qr/link_article conten
     $event->{'url'}=$mech->uri()->as_string;
 
     # Gelegentlich gibt's mehr als einen Termin:
+    my @termine;
     foreach my $detail_calendar_item ($tree->look_down('_tag'=>'div','class'=>qr/detail_calendar_item/)) {
 
 	# Beginn
@@ -109,6 +110,10 @@ foreach my $eventPage ($mech->find_all_links(class_regex=>qr/link_article conten
 	    # Entferne Doppelpunkt am Ende
 	    $event->{'ort'}=~s/:$//;
 	};
+
+	# Überspringe doppelte Termine
+	next if (grep { $event->{'beginn'} eq $_ }  @termine);
+	push(@termine,$event->{'beginn'});
 
 	push(@events,$event);
     }
