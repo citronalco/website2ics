@@ -120,9 +120,20 @@ foreach my $eventLink (keys (%links)) {
 
     $event->{'ende'}=$event->{'beginn'}->clone();
 
-    $event->{'ende'}->set_year("20".$endYear) if defined($endYear);
-    $event->{'ende'}->set_month($endMonth) if defined($endMonth);
-    $event->{'ende'}->set_day($endDay) if defined($endDay);
+    if (defined($endMonth) and defined($endDay)) {
+	if (defined($endYear)) {
+	    $event->{'ende'}->set("year"=>"20".$endYear, "month"=>$endMonth, "day"=>$endDay);
+	}
+	else {
+	    $event->{'ende'}->set("month"=>$endMonth, "day"=>$endDay);
+	}
+    }
+    else {
+	$event->{'ende'}->set_year("20".$endYear) if defined($endYear);
+	$event->{'ende'}->set_month($endMonth) if defined($endMonth);
+	$event->{'ende'}->set_day($endDay) if defined($endDay);
+    }
+
     $event->{'ende'}->set_hour($endHour) if defined($endHour);
     $event->{'ende'}->set_minute($endMinute) if defined($endMinute);
 
