@@ -170,14 +170,18 @@ foreach my $monthSection ($root->look_down('_tag'=>'section','class'=>'events'))
 	    if ($text_html=~/(\d+):?(\d{2})?\s*(?:bis|[\-–]|&ndash;|&dash;)\s*(\d+):?(\d{2})?\s+Uhr/i) {
 		$event->{'beginn'}=$event->{'start'}->clone();
 		$event->{'beginn'}->set(hour=>$1, minute=>($2//"0"));
-		$event->{'ende'}->set(hour=>$3, minute=>($4//"0"));
-	    }
-	}
 
-	# Wenn überhaupt keine Zeitangabe gefunden werden konnte: Als Ganztagesevent eintragen
-	if (!$event->{'einlass'} and !$event->{'beginn'}) {
-	    $event->{'fullday'}=1;
-	    $event->{'ende'}=$event->{'start'}->clone();
+		$event->{'ende'}=$event->{'start'}->clone();
+		$event->{'ende'}->set(hour=>$3, minute=>($4//"0"));
+		if ($event->{'ende'} < $event->{'beginn'}) {
+		    $event->{'ende'}->add(days=>1);
+		}
+	    }
+	    else {
+		# Wenn überhaupt keine Zeitangabe gefunden werden konnte: Als Ganztagesevent eintragen
+		$event->{'fullday'}=1;
+		$event->{'ende'}=$event->{'start'}->clone();
+	    }
 	}
 
 	# Fehlende Zeitangaben ergänzen
