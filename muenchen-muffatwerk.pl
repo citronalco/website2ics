@@ -128,6 +128,10 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     elsif ($datum=~/^[A-Z][a-z](\d{2})\.(\d{2})(\d{2})$/) {
 	$event->{'beginn'}->set(day=>$1,month=>$2,year=>"20".$3);
     }
+    # "Di25.08"
+    elsif ($datum=~/^[A-Z][a-z](\d{2})\.(\d{2})$/) {
+	$event->{'beginn'}->set(day=>$1,month=>$2);
+    }
     # "15./17./18./19.05."
     elsif ($datum=~/^(\d+)\.(?:\/\d+\.)+(\d+)\.?$/) {
 	$event->{'beginn'}->set(day=>$1,month=>$2);
