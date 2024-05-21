@@ -92,6 +92,7 @@ foreach my $eventLink (keys (%links)) {
     $event->{'typ'}=$links{$eventLink}{'typ'};
 
     $mech->get($eventLink);
+    #print $eventLink."\n";
 
     my $eTree=HTML::TreeBuilder->new_from_content($mech->content);
     my $eventDetails=$eTree->look_down('_tag'=>'div','id'=>'event-details');
@@ -107,7 +108,7 @@ foreach my $eventLink (keys (%links)) {
 	$startHour,$startMinute,
 	$endDay,$endMonth,$endYear,
 	$endHour,$endMinute)=
-	    $dateTime=~/^\s*(\d{2})\.(\d{2})\.\d*(\d{2})\s?(?:(\d{2}):(\d{2})(?::\d{2})?)?\s?(?:\p{Pd})?\s?(?:(\d{2})\.(\d{2})\.\d*(\d{2}))?\s?(?:(\d{2}):(\d{2})(?::\d{2})?)?\s*$/;
+	    $dateTime=~/^\s*(\d{2})\.(\d{2})\.\d*(\d{2}),?\s?(?:(\d{2}):(\d{2})(?::\d{2})?)?\s?(?:\p{Pd})?\s?(?:(\d{2})\.(\d{2})\.\d*(\d{2}))?,?\s?(?:(\d{2}):(\d{2})(?::\d{2})?)?\s*$/;
 
     $event->{'beginn'}=DateTime->new(
 	day => $startDay,
