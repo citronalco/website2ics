@@ -84,15 +84,30 @@ foreach my $eventLink (@eventLinks) {
     try {
 	# Einlass
 	my $einlass=($root->look_down('id'=>'eventStarttime'))->as_trimmed_text;
-	my ($einlass_h,$einlass_m)=$einlass=~/(\d{1,2})[\.:](\d{1,2})/;
-	$event->{'einlass'}=$datumFormat->parse_datetime($datum." ".$einlass_h.".".$einlass_m);
+	if ($einlass =~/^TBA$/i) {
+	    # "TBA" als Ganztagesevents eintragen
+	    $event->{'einlass'}=$datumFormat->parse_datetime($datum." 00.00");
+	    $event->{'fullday'}=1;
+	}
+	else {
+	    my ($einlass_h,$einlass_m)=$einlass=~/(\d{1,2})[\.:](\d{1,2})/;
+	    $event->{'einlass'}=$datumFormat->parse_datetime($datum." ".$einlass_h.".".$einlass_m);
+	}
+
 	# Beginn
 	my $beginn=($root->look_down('id'=>'eventStagetime'))->as_trimmed_text;
-	my ($beginn_h,$beginn_m)=$beginn=~/(\d{1,2})[\.:](\d{1,2})/;
-	$event->{'beginn'}=$datumFormat->parse_datetime($datum." ".$beginn_h.".".$beginn_m);
+	if ($beginn =~/^TBA$/i) {
+	    # "TBA" als Ganztagesevents eintragen
+	    $event->{'beginn'}=$datumFormat->parse_datetime($datum." 00.00");
+	    $event->{'fullday'}=1;
+	}
+	else {
+	    my ($beginn_h,$beginn_m)=$beginn=~/(\d{1,2})[\.:](\d{1,2})/;
+	    $event->{'beginn'}=$datumFormat->parse_datetime($datum." ".$beginn_h.".".$beginn_m);
+	}
     };
     # Events ohne Uhrzeit sind abgesagte Events
-    unless ($event->{'einlass'}) {
+    unless (($event->{'fullday'}) or ($event->{'einlass'})) {
 	if ($mech->content=~/(abgesagt)|(verlegt)/i) {
 	    next;
 	}
@@ -230,9 +245,8 @@ foreach my $event (@eventList) {
 	categories=>$event->{'genre'},
 	summary => $event->{'name'},
 	description => $description,
-	dtstart => dt2icaldt($event->{'beginn'}),
-	#duration=>"PT3H",
-	dtend => dt2icaldt($event->{'ende'}),
+	dtstart => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'beginn'}) : dt2icaldt($event->{'beginn'}),
+	dtend => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'ende'}) : dt2icaldt($event->{'ende'}),
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
 #	organizer=>"CN=\"".$event->{'veranstalter'}."\"",
