@@ -123,10 +123,14 @@ foreach my $eventLink ($mech->find_all_links('url_regex'=>qr/^https:\/\/www.der-
     my $einlassBeginn=$bLinks->look_down('_tag'=>'p','class'=>undef,sub {
 	    $_[0]->as_trimmed_text()=~/Beginn:/
 	})->as_trimmed_text();
-    $einlassBeginn=~/^Einlass: (\d{2}:\d{2}) UhrBeginn: (\d{2}:\d{2}) Uhr(.+)$/;
-
-    $event->{'einlass'}=$datumFormat->parse_datetime($datum." ".$1);
-    $event->{'beginn'}=$datumFormat->parse_datetime($datum." ".$2);
+    if ($einlassBeginn=~/^Einlass: (\d{2}:\d{2}) Uhr/) {
+	$event->{'einlass'}=$datumFormat->parse_datetime($datum." ".$1);
+    }
+    if ($einlassBeginn=~/Beginn: (\d{2}:\d{2}) Uhr/) {
+	$event->{'beginn'}=$datumFormat->parse_datetime($datum." ".$1);
+    }
+    if (!$event->{'einlass'}) { $event->{'einlass'}=$event->{'beginn'}; }
+    if (!$event->{'beginn'}) { $event->{'beginn'}=$event->{'einlass'}; }
 
     # Ort
     $event->{'ort'}=$bLinks->look_down('_tag'=>'p','class'=>'smallfont', sub {
