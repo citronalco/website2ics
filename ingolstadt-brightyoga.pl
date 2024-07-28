@@ -156,7 +156,20 @@ foreach my $u (@urls) {
 	    if ($event->{'location'}=~/Livestream/) {
 		$event->{'emptyseats'}="Ohne Teilnehmerbegrenzung";
 	    }
-	    push(@eventList,$event);
+
+	    # Keine doppelten Einträge erzeugen
+	    my $identical=0;
+	    foreach my $e (@eventList) {
+		$identical=1;
+		foreach my $k (keys %$e) {
+		    if ($e->{$k} ne $event->{$k}) {
+			$identical=0;
+			last;
+		    }
+		}
+		last if ($identical==1);
+	    }
+	    push(@eventList,$event) if ($identical==0);
 	}
     }
 }
