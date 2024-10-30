@@ -146,8 +146,10 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
 	next;
     }
     else {
-	die("Unbekanntes Datumsformat: ".$datum."\n".$event->{'url'}."\n");
-	#next;
+	#die("Unbekanntes Datumsformat: ".$datum."\n".$event->{'url'}."\n");
+
+	print STDERR "WARN: Unbekanntes Datumsformat: ".$datum."\n".$event->{'url'}."\n";
+	next;
     }
 
     # wenn z.B. durch Jahreswechsel die so erstellte Einlasszeit zu weit in der Vergangenheit liegt: 1 Jahr dazuzuzählen
