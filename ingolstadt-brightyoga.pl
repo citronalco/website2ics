@@ -31,7 +31,7 @@ my @urls=(
     { 'url' => "https://www.brightyoga.de/offene-stunden-wochenplan/", 'ort' => "Bright Yoga, Griesmühlstraße 2, Ingolstadt" },
     { 'url' => "https://www.brightyoga.de/offene-stunden-wochenplan-stream/", 'ort' => "Livestream" } );
 
-my $beschreibungsUrl="https://www.brightyoga.de/termine/kursbeschreibungen/";
+#my $beschreibungsUrl="https://www.brightyoga.de/termine/kursbeschreibungen/";
 
 my $ajaxUrl="https://www.brightyoga.de/wp-admin/admin-ajax.php";
 
@@ -225,7 +225,9 @@ foreach my $event (@eventList) {
     push(@desc, $event->{'subtitle'}) if ($event->{'subtitle'});
     push(@desc, "Mit <b>".$event->{'trainer'}."</b>") if ($event->{'trainer'});
     push(@desc, $event->{'emptyseats'}) if ($event->{'emptyseats'});
-    push(@desc, "<a href='".$beschreibungsUrl."'>Beschreibung</a> <a href='".$event->{'url'}."'>Anmeldung</a>");
+    #push(@desc, "<a href='".$beschreibungsUrl."'>Beschreibung</a>");
+    #push(@desc, "<a href='".$event->{'url'}."'>Anmeldung</a>");
+    push(@desc, "<a href='".$event->{'url'}."'>Beschreibung und Anmeldung</a>");
     my $description=join("<p/>",@desc);
 
     # Create uid
