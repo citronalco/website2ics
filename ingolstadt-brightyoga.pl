@@ -254,6 +254,6 @@ foreach my $event (@eventList) {
     $count++;
 }
 
-die("Keine Einträge") if (($count==0) and not (($today->month==12 and $today->day>20) or ($today->month==1 and $today->day<10)));
+die("Keine Einträge") if (($count==0) and not (($today->month==12 and $today->day>15) or ($today->month==1 and $today->day<15)));
 
 print $calendar->as_string;
