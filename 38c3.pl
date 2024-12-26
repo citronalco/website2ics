@@ -54,11 +54,21 @@ my $data = JSON::decode_json($mech->content());
 # Create ICS
 my $calendar = Data::ICal->new(auto_uid=>1);
 
+my $calendarName = $data->{'schedule'}->{'conference'}->{'title'};
+if (defined($ARGV[0])) {
+    if ($ARGV[0] eq "main") {
+	$calendarName .= " - Main Stages";
+    }
+    elsif ($ARGV[0] eq "notmain") {
+	$calendarName .= " - Side Stages";
+    }
+}
+
 $calendar->add_properties(
     method=>"PUBLISH",
-    "X-PUBLISHED-TTL"=>"PT10M",	# 10 minutes refresh interval
-    "X-WR-CALNAME"=>$data->{'schedule'}->{'conference'}->{'title'},
-    "X-WR-CALDESC"=>$data->{'schedule'}->{'conference'}->{'url'},
+    "X-PUBLISHED-TTL" => "PT10M",	# 10 minutes refresh interval
+    "X-WR-CALNAME" => $calendarName,
+    "X-WR-CALDESC" => $data->{'schedule'}->{'conference'}->{'url'},
 );
 
 # Add VTIMEZONE
