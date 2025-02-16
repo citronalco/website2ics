@@ -16,6 +16,7 @@ Um keine (oder weniger) Termine zu verpassen habe ich einige Skripte geschrieben
 | Ingolstadt (Stadt) | https://www.ingolstadt.de/Kultur/Veranstaltungen/Veranstaltungskalender | `ingolstadt-stadtIngolstadt.pl` | https://www.geierb.de/~geierb/kalender/stadt-ingolstadt.ics |
 | Ingolstadt, Bright Yoga (nur offene Stunden) | https://www.brightyoga.de/ | `ingolstadt-brightyoga.pl`| https://www.geierb.de/~geierb/kalender/brightyoga.ics |
 | München, Backstage | https://backstage.eu/veranstaltungen.html | `muenchen-backstage.pl` | https://www.geierb.de/~geierb/kalender/backstage.ics |
+| München, Eventfabrik (handWERK, Mariss-Jansons-Platz, Container Collective, Knödelplatz, WERK7 Theater, Technikum, TonHalle) | `muenchen-eventfabrik.pl` | https://www.geierb.de/~geierb/kalender/eventfabrik.ics |
 | München, Milla | https://www.milla-club.de/category/event/ | `muenchen-milla.pl` | https://www.geierb.de/~geierb/kalender/milla.ics |
 | München, Muffatwerk (mit Club Ampere) | https://www.muffatwerk.de/de/events | `muenchen-muffatwerk.pl` | https://www.geierb.de/~geierb/kalender/muffatwerk.ics |
 | München, Strom | https://strom-muc.de/ | `muenchen-strom.pl`  | https://www.geierb.de/~geierb/kalender/strom.ics |
@@ -25,7 +26,7 @@ Um keine (oder weniger) Termine zu verpassen habe ich einige Skripte geschrieben
 Die Demo-Kalender werden täglich aktualisiert und können abonniert werden.
 
 https://www.geierb.de/~geierb/kalender/konzerte-ingolstadt.ics bündelt alle Veranstaltungen für Ingolstadt von Eventhalle Westpark, Neue Welt, Kulturamt und KAP94. \
-Dazu werden die einzelnen Kalender mit `merge-ics` zusammengefügt.
+Dazu werden die einzelnen Kalender mit `merge-icals` (https://git.bingo-ev.de/geierb/merge-icals) zusammengefügt.
 
 ## Verwendung
 Beispiel:
@@ -35,7 +36,7 @@ So richtig nützlich wird's erst, wenn man die Skripte automatisch regelmäßig 
 
 ## Weitere Webseiten
 - Das **Freilichtkino im Turm Baur** (Ingolstadt) hat eine Wordpress-Webseite und verwendet das "All-in-One Event Calendar"-Plugin. Dieses Plugin kann ics-Dateien ausgeben, das Freilichtkino hat nur den Knopf dazu ausgeblendet. Zum Abonnieren des Kalenders diese URL benutzen: [https://www.freilichtkino-turm-baur.de/?plugin=all-in-one-event-calendar&controller=ai1ec_exporter_controller&action=export_events&no_html=true](https://www.freilichtkino-turm-baur.de/?plugin=all-in-one-event-calendar&controller=ai1ec_exporter_controller&action=export_events&no_html=true)
-- Die **Eventfabrik München** (Tonhalle, Knödelplatz,...) hat auf ihrer Webseite (https://www.eventfabrik-muenchen.de/events/) einen Link zum Kalender-Abonnieren ("ical download"). Sehr gut!
+- ~~Die **Eventfabrik München** (Tonhalle, Knödelplatz,...) hat auf ihrer Webseite (https://www.eventfabrik-muenchen.de/events/) einen Link zum Kalender-Abonnieren ("ical download"). Sehr gut!~~
 
 ## Lizenz
 Dieses Projekt ist lizenziert unter der AGPL (https://www.gnu.org/licenses/agpl-3.0.de.html).
