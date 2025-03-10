@@ -97,10 +97,10 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/${url}event\//)) {
 	$event->{'beschreibung'}=$root->look_down('_tag'=>'div','class'=>'gdlr-event-content')->as_text;
 	$event->{'beschreibung'}=~s/Der Inhalt ist nicht verfügbar.*?Bitte erlaube Cookies, indem du auf Übernehmen im Banner klickst.//;
 
-        # Ersetze Unicode-Linebreaks durch normale
-        $event->{'beschreibung'}=~s/\R/\n/g;
-        # Nichtdruckbare Zeichen (^H usw) ausfiltern
-        $event->{'beschreibung'}=~s/[^[:print:]]+//g;
+	# Ersetze Unicode-Linebreaks durch normale
+	$event->{'beschreibung'}=~s/\R/\n/g;
+	# Nichtdruckbare Zeichen (^H usw) ausfiltern
+	$event->{'beschreibung'}=~s/[^[:print:]]+//g;
     };
 
     my $infoWrapper=$root->look_down('_tag'=>'div','class'=>'gdlr-event-info-wrapper');
@@ -108,10 +108,10 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/${url}event\//)) {
     try {
 	my $datum=$infoWrapper->look_down('_tag'=>'div','class'=>'gdlr-info-date gdlr-info',
 		sub {
-		    $_[0]->as_text=~/^Datum:/
+		    $_[0]->as_text=~/^(?:Datum|Date):/
 		}
 	)->as_trimmed_text;
-	$datum=~/Datum: (\d+\.\d+\.\d+)/;
+	$datum=~/(?:Datum|Date): (\d+\.\d+\.\d+)/;
 	$event->{'datum'}=$1;
     };
     # Verschoben?
@@ -139,7 +139,6 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/${url}event\//)) {
 		}
 	    ));
 
-
     # Ohne Datum kein Kalendereintrag
     next unless $event->{'datum'};
 
@@ -147,7 +146,7 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/${url}event\//)) {
     try {
 	my $uhrzeit=$infoWrapper->look_down('_tag'=>'div','class'=>'gdlr-info-time gdlr-info',
 		sub {
-		    $_[0]->as_text=~/^Uhrzeit:/
+		    $_[0]->as_text=~/^(?:Uhrzeit|Time):/
 		}
 	    )->as_trimmed_text;
 
@@ -182,10 +181,10 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/${url}event\//)) {
     try {
 	my $veranstalter=$infoWrapper->look_down('_tag'=>'div','class'=>'gdlr-info-time gdlr-info',
 		sub {
-		    $_[0]->as_text=~/^Veranstalter:/
+		    $_[0]->as_text=~/^(?:Veranstalter|Organizer):/
 		}
 	    )->as_trimmed_text;
-	$veranstalter=~s/^Veranstalter: //;
+	$veranstalter=~s/^(?:Veranstalter|Organizer)://;
 	$event->{'veranstalter'}=$veranstalter;
     };
 
@@ -271,8 +270,8 @@ foreach my $event (@eventList) {
 	summary => $event->{'titel'},
 	description => $description,
 	categories => $event->{'kategorie'},
-        dtstart => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'beginn'}) : dt2icaldt($event->{'beginn'}),
-        dtend => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'ende'}) : dt2icaldt($event->{'ende'}),
+	dtstart => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'beginn'}) : dt2icaldt($event->{'beginn'}),
+	dtend => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'ende'}) : dt2icaldt($event->{'ende'}),
 	dtstamp=>$dstamp,
 	class=>"PUBLIC",
 	organizer=>"MAILTO:foobar",
