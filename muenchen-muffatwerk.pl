@@ -74,9 +74,6 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     }
     next if $found==1;
 
-    # "Biergarten" überspringen
-    next if ($event->{'url'}=~/\/biergarten$/);
-
     # Event-Seite laden
     my $ok=eval { $mech->get($eventLink); }; # sometimes some links are broken
     next unless ($ok);
@@ -142,7 +139,7 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     }
 
     # "Montag ab 12 Uhr geöffnet" oder: "ab 12 Uhr" (wenn "heute" oder "morgen")  -> Biergarten, usw., keine echte Verantstaltung, überspringen
-    elsif ($datum=~/^\D*ab\d+Uhr/i)  {
+    elsif (($datum=~/^\D*ab\d+Uhr/i) or ($datum=~/^\D*ab\d+\.\d+$/i))  {
 	next;
     }
     else {
