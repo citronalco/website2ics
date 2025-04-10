@@ -1,213 +1,109 @@
 #!/usr/bin/perl
-# 2022 geierb@geierb.de
+# geierb@geierb.de
 # AGPLv3
 
 use strict;
 use WWW::Mechanize;
+use WWW::Mechanize::GZip;
 use HTML::Entities;
 use HTML::TreeBuilder;
+use HTML::Strip;
 
-use DateTime::Format::Strptime;
-use DateTime::Format::ICal;
+use HTTP::Request::Common;
+
+use JSON;
+
 use Data::ICal;
 use Data::ICal::Entry::Event;
-use Data::ICal::Entry::TimeZone;
-use Data::ICal::Entry::TimeZone::Daylight;
-use Data::ICal::Entry::TimeZone::Standard;
-
-use Time::HiRes;
-
-use POSIX qw(strftime);
 
 use Try::Tiny;
 
 use utf8;
-use Data::Dumper;
 use warnings;
 
+use Encode;
 
-my $url="https://z-bau.com/programm/";
-my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht im Programm, wird aber für Kalendereintrag gebraucht)
+#use Data::Dumper;
 
+# Z-Bau already provides an ICS file for each event
+# This script filters fetches them all, and merges them together
 
-my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%Y-%m-%d %H:%M','time_zone'=>'Europe/Berlin');
-binmode STDOUT, ":utf8";	# Gegen "wide character"-Warnungen
-
-# convert datetime to DTSTART/DTEND property value
-sub dt2icaldt {
-    my ($dt)=@_;
-    my $icalformatdt=DateTime::Format::ICal->format_datetime($dt);
-    if (my ($id,$string)=$icalformatdt=~/^TZID=(.+?):(.+)$/) {
-        return [ $string, {TZID => $id} ];
-    }
-    else {
-        return $icalformatdt;
-    }
-}
-
-# convert datetime to DTSTART/DTEND property value for allday events
-sub dt2icaldt_fullday {
-    my ($dt)=@_;
-    return [ $dt->ymd(''),{VALUE=>'DATE'} ];
-}
-
-
-my $mech=WWW::Mechanize->new();
-
-my @eventList;
-
-
-$mech->get($url) or die($!);
-my $root=HTML::TreeBuilder->new();
-$root->ignore_unknown(0);	# "article"-Tag wird sonst nicht erkannt
-$root->parse_content($mech->content());
-
-# Programm raussuchen
-my $programm=$root->look_down('_tag'=>'div','class'=>'programm');
-foreach my $article ($programm->look_down('_tag'=>'article','class'=>qr/event/)) {
-    my $event;
-
-    $event->{'url'}=$article->attr('data-url');
-    #print $event->{'url'}."\n";
-
-    # Bereits vorhandene überspringen
-    my $found=0;
-    foreach my $e (@eventList) {
-        if ($e->{'url'} eq $event->{'url'}) {
-	    $found=1;
-	    last;
-	}
-    }
-    next if $found==1;
-
-
-    # URL enthält Datum mit Jahr
-    ($event->{'datum'})=$event->{'url'}=~/${url}(\d{4}-\d{2}-\d{2})\//;
-
-    # Einlass
-    try {
-	my $einlass=$article->look_down('_tag'=>'span','class'=>'event__einlass')->as_trimmed_text;
-	$event->{'einlass'}=$datumFormat->parse_datetime($event->{'datum'}." ".$einlass);
-    };
-
-    # Beginn
-    try {
-	my $beginn=$event->{'beginn'}=$article->look_down('_tag'=>'span','class'=>'event__beginn')->as_trimmed_text;
-	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." ".$beginn);
-    };
-
-    # Weder Einlass- noch Beginnuhrzeit? -> Ganztages-Event
-    if (!($event->{'einlass'}) and !($event->{'beginn'})) {
-	$event->{'fullday'} = 1;
-	$event->{'beginn'}=$datumFormat->parse_datetime($event->{'datum'}." 00:00");
-	$event->{'ende'}=$datumFormat->parse_datetime($event->{'datum'}." 23:59");
-    }
-    else {
-	if (!($event->{'einlass'}) and ($event->{'beginn'})) { $event->{'einlass'}=$event->{'beginn'}; }
-	if (!($event->{'beginn'}) and ($event->{'einlass'})) { $event->{'beginn'}=$event->{'einlass'}; }
-
-	# Ende
-	$event->{'ende'}=$event->{'beginn'}->clone();
-	$event->{'ende'}->add(minutes=>$defaultDauer);
-    }
-
-
-    try {
-	# Abgesagte Events sind zwar im Programm, aber mit anderen Klassen. Müssen nicht extra rausgefiltert werden.
-	$event->{'titel'}=$article->look_down('_tag'=>'div','class'=>'event__title')->look_down('class'=>'event__main-title')->as_trimmed_text;
-    };
-    next unless ($event->{'titel'});
-
-    $event->{'untertitel'}=$article->look_down('_tag'=>'div','class'=>'event__title')->look_down('class'=>'event__sub-title')->as_trimmed_text;
-    $event->{'ort'}=$article->look_down('_tag'=>'div','class'=>'event__location')->as_trimmed_text;
-    try {
-	$event->{'tickets'}=$article->look_down('_tag'=>'div','class'=>'event__tickets')->look_down('_tag'=>'a','class'=>'event__ticket-link')->attr('href');
-    };
-    $event->{'beschreibung'}=$article->look_down('_tag'=>'div','class'=>'event__info-text')->as_trimmed_text;
-    $event->{'eintritt'}=$article->look_down('_tag'=>'div','class'=>'event__eintritt')->as_trimmed_text;
-
-    push(@eventList,$event);
-    #print Dumper $event;
-}
-
-# Create Datestamp for dtstamp
-my @stamp=localtime;
-my $dstamp = sprintf("%d%02d%02dT%02d%02d%02dZ",
-    $stamp[5] + 1900,
-    $stamp[4] + 1,
-    $stamp[3],
-    $stamp[2],
-    $stamp[1],
-    $stamp[0]);
+my $URL="https://z-bau.com/programm";
 
 my $calendar=Data::ICal->new();
 $calendar->add_properties(method=>"PUBLISH",
-        "X-PUBLISHED-TTL"=>"P1D",
-        "X-WR-CALNAME"=>"Z-Bau",
-        "X-WR-CALDESC"=>"Veranstaltungen Z-Bau");
+    "X-PUBLISHED-TTL"=>"P1D",
+    "X-WR-CALNAME"=>"Z-Bau",
+    "X-WR-CALDESC"=>"Veranstaltungen Z-Bau");
 
-# Add VTIMEZONE
-my $tz="Europe/Berlin";
-my $vtimezone=Data::ICal::Entry::TimeZone->new();
-$vtimezone->add_properties(tzid=>$tz);
+# avoid "wide character" warnings
+binmode STDOUT, ":utf8";
+my $mech=WWW::Mechanize::GZip->new();
 
-my $tzDaylight=Data::ICal::Entry::TimeZone::Daylight->new();
-$tzDaylight->add_properties(
-    tzoffsetfrom => "+0100",
-    tzoffsetto  => "+0200",
-    dtstart     => "19700329T020000",
-    tzname      => "CEST",
-    rrule       => "FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU"
+my $htmlStripper=HTML::Strip->new();
+
+$mech->get($URL) or die($!);
+my $tree=HTML::TreeBuilder->new_from_content($mech->content());
+
+# Get APP ID, API-Key and API server from events-BLABLA.js script
+# 1. figure out script URL
+my $eventScriptUrl=$tree->look_down('_tag'=>'head')->look_down('_tag'=>'script', 'src'=>qr/\/events\-.*.js$/)->{'src'};
+# 2. fetch script
+my $eventScript=$mech->get($eventScriptUrl)->content;
+# 3 extract info
+my ($SEARCH_API_KEY)=($eventScript=~/VITE_ALGOLIA_SEARCH_API_KEY:\"(.+?)\"/);
+my ($APP_ID)=($eventScript=~/VITE_ALGOLIA_APP_ID:\"(.+?)\"/);
+my $API_SERVER="https://".lc($APP_ID)."-dsn.algolia.net";
+
+# Use API call to search for events "*", returns JSON
+my $ua=LWP::UserAgent->new;
+my $request=HTTP::Request::Common::POST(
+    $API_SERVER.'/1/indexes/*/queries',
+    "x-algolia-api-key" => $SEARCH_API_KEY,
+    "x-algolia-application-id" => $APP_ID,
+    Content => '{"requests":[{"indexName":"zbau-001","params":"facetFilters=%5B%5B%22is_beergarden%3A0%22%5D%2C%5B%22is_past%3A0%22%5D%5D&facets=%5B%22date_filter_string%22%2C%22is_beergarden%22%2C%22is_past%22%2C%22type%22%5D&highlightPostTag=__%2Fais-highlight__&highlightPreTag=__ais-highlight__&maxValuesPerFacet=1000&page=0&query="},{"indexName":"zbau-001","params":"analytics=false&clickAnalytics=false&facetFilters=%5B%5B%22is_past%3A0%22%5D%5D&facets=is_beergarden&highlightPostTag=__%2Fais-highlight__&highlightPreTag=__ais-highlight__&hitsPerPage=0&maxValuesPerFacet=1000&page=0&query="},{"indexName":"zbau-001","params":"analytics=false&clickAnalytics=false&facetFilters=%5B%5B%22is_beergarden%3A0%22%5D%5D&facets=is_past&highlightPostTag=__%2Fais-highlight__&highlightPreTag=__ais-highlight__&hitsPerPage=0&maxValuesPerFacet=1000&page=0&query="}]}'
 );
-$vtimezone->add_entry($tzDaylight);
+my $response=$ua->request($request) or die($!);
 
-my $tzStandard=Data::ICal::Entry::TimeZone::Standard->new();
-$tzStandard->add_properties(
-    tzoffsetfrom => "+0200",
-    tzoffsetto  => "+0100",
-    dtstart     => "19701025T030000",
-    tzname      => "CET",
-    rrule       => "FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU"
-);
-$vtimezone->add_entry($tzStandard);
+my $data = JSON::decode_json($response->content);
 
-$calendar->add_entry($vtimezone);
+# Loop through results and fetch ICS for each event
+foreach my $result (@{$data->{'results'}[0]->{'hits'}}) {
+
+    my $price=$htmlStripper->parse($result->{'_highlightResult'}->{'price'}->{'value'});
+    $price=~s/^\s*(?:Eintritt:)?\s*//;
+
+    my $presaleUrl=$result->{'presale'};
+
+    my $subtitle=$result->{'subtitle'};
+
+    my $calendarUrl=$result->{'calendar_file_url'};
+
+    # Fetch ICS
+    $mech->get($calendarUrl) or die ($!);
+
+    # Parse ICS
+    my @filtered;
+    my @lines=split /\n/, decode('UTF-8',$mech->content());
+    foreach my $line (@lines) {
+        # Data::ICal::Entry does not understand REFRESH-INTERVAL, so filter that out
+	next if $line=~/^refresh-interval/i;
+
+	# add subtitle, price and presaleUrl to DESCRIPTION
+	if ($line=~/^(DESCRIPTION:)(.*)/) {
+	    $line=$1.$subtitle.'\n\nEintritt: '.$price.'\nVorverkauf: '.$presaleUrl.'\n'.$2;
+	}
+
+        push(@filtered,$line) unless $line=~/^refresh-interval/i;
+    }
+    my $zCalendar=Data::ICal->new(data=>join("\n", @filtered));
 
 
-my $count=0;
-foreach my $event (@eventList) {
-    # Create uid
-    my @tm=localtime();
-    my $uid=sprintf("%d%02d%02d%02d%02d%02d%s%02d\@geierb.de",
-                    $tm[5] + 1900, $tm[4] + 1, $tm[3], $tm[2],
-                    $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
+    # Append to calendar
+    foreach my $entry (@{$zCalendar->entries}) {
+	$calendar->add_entry($entry);
 
-    ## Beschreibung bauen
-    my $description;
-    $description.=$event->{'untertitel'}." \n\n" if ($event->{'untertitel'});
-    $description.=$event->{'eintritt'}." \n" if ($event->{'eintritt'});
-    $description.="Vorverkauf: ".$event->{'tickets'}." \n" if ($event->{'tickets'});
-    $description.="Einlass: ".sprintf("%.2d",$event->{'einlass'}->hour).":".sprintf("%.2d",$event->{'einlass'}->min)." Uhr \n" if ($event->{'einlass'});
-    $description.="\n ".$event->{'beschreibung'}." \n";
-
-    my $eventEntry=Data::ICal::Entry::Event->new();
-    $eventEntry->add_properties(
-	uid=>$uid,
-	summary => $event->{'titel'},
-	description => $description,
-	categories => $event->{'category'},
-	dtstart => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'beginn'}) : dt2icaldt($event->{'beginn'}),
-	dtend => ($event->{'fullday'}) ? dt2icaldt_fullday($event->{'ende'}) : dt2icaldt($event->{'ende'}),
-	dtstamp=>$dstamp,
-	class=>"PUBLIC",
-	organizer=>"MAILTO:foobar",
-	location=>$event->{'ort'},
-	url=>$event->{'url'},
-    );
-
-    $calendar->add_entry($eventEntry);
-    $count++;
+    }
 }
-die("Keine Einträge") if ($count==0);
 
 print $calendar->as_string;
