@@ -116,32 +116,12 @@ foreach my $u (@urls) {
 	    $event->{'url'}=$entry->look_down('_tag'=>'a')->attr('href');
 
 	    # Freie Plätze
-	    #$event->{'emptyseats'}=$entry->look_down('class'=>'event-attendance')->as_trimmed_text;
-
-	    # Anzahl der freien Plätze steht nicht mehr in der Terminübersicht, daher auf Anmeldeseite wechseln
-	    $mech->get($event->{'url'});
-	    my $loginRoot=HTML::TreeBuilder->new();
-	    $loginRoot->ignore_unknown(0);       # "time"-Tag wird sonst nicht erkannt
-	    $loginRoot->parse_content($mech->content());
-
-	    # Spalte mit passendem Datum suchen
-	    my @spalten=$loginRoot->look_down('_tag'=>'div','class'=>'slide');
-	    foreach my $spalte (@spalten) {
-
-		# "MONTAG, 15.3.2022"
-		my $datestring=$spalte->look_down('_tag'=>'h3')->as_trimmed_text;
-		$datestring=~s/(^\D+,\s+)//;
-
-		my $columndate=$datumFormat->parse_datetime($datestring." 00:00");
-		if ($event->{'start'}->ymd eq $columndate->ymd) {
-		    try {
-			# Abgesagte Veranstaltungen haben keine availability
-			$event->{'emptyseats'}=$spalte->look_down('_tag'=>'p','class'=>'availability')->as_trimmed_text;
-		    }
-		    catch { };
-		    last;
-		}
-	    }
+	    try {
+		$event->{'emptyseats'}=$entry->look_down('class'=>qr/^attendance/)->as_trimmed_text;
+		# leider pappt da das Datum hinten dran
+		$event->{'emptyseats'}=~s/$dmy$//;
+	    };
+	    # Abgesagte Veranstaltungen haben keine availability
 	    next unless defined($event->{'emptyseats'});
 
 	    # Subtitel
