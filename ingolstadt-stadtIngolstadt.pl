@@ -159,10 +159,13 @@ foreach my $event (@eventList) {
     $event->{'ende'}=$event->{'beginn'}->clone();
     $event->{'ende'}->add(minutes=>120);
 
-    my $description = $event->{'beschreibung'}." \n\n";
+    my $description;
+    $description.= $event->{'beschreibung'}." \n\n" if ($event->{'beschreibung'});
+
     if ($event->{'preis'}=~"kostenlos") { $description.="Eintritt kostenlos\n"; }
     else { $description.="Tickets: ".$event->{'preis'}."\n"; }
-    if ($event->{'vvkUrl'}) { $description.="Vorverkauf: ".$event->{'vvkUrl'}."\n"; }
+
+    $description.="Vorverkauf: ".$event->{'vvkUrl'}."\n" if ($event->{'vvkUrl'});
     $description.="Veranstalter: ".$event->{'veranstalter'};
 
 
