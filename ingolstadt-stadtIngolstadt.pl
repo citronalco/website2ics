@@ -166,7 +166,7 @@ foreach my $event (@eventList) {
     else { $description.="Tickets: ".$event->{'preis'}."\n"; }
 
     $description.="Vorverkauf: ".$event->{'vvkUrl'}."\n" if ($event->{'vvkUrl'});
-    $description.="Veranstalter: ".$event->{'veranstalter'};
+    $description.="Veranstalter: ".$event->{'veranstalter'} if ($event->{'veranstalter'});
 
 
     my $eventEntry=Data::ICal::Entry::Event->new();
