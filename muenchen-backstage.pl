@@ -133,7 +133,7 @@ for my $vevent (@{$vevents}) {
     my $f=0;
     for my $row (@rows) {
 	$datumzeit=$row->as_trimmed_text;
-	my ($day,$monthname,$year,$beginnHH,$beginnMM,$einlassHH,$einlassMM)=$datumzeit=~/\w+ (\d{1,2})\. (\w+) (\d{4})Beginn(\d{1,2})[:\.](\d{2}) UhrEinlass\D*(\d{1,2})[:\.]0?(\d{2}) Uhr/;
+	my ($day,$monthname,$year,$beginnHH,$beginnMM,$einlassHH,$einlassMM)=$datumzeit=~/\w+ (\d{1,2})\. (\w+) (\d{4})Beginn(\d{1,2})[:\.]?(\d{2}) UhrEinlass\D*(\d{1,2})[:\.]?0?(\d{2}) Uhr/;
 	my $month=1+first_index { $_ eq lc($monthname) } @months;
 	my $d = sprintf("%0.2d/%0.2d/%d",$month,$day,$year);
 	next unless ($d=~$vevent->{'date'});
