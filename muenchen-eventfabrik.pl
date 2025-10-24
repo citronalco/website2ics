@@ -77,7 +77,12 @@ while ($mech->status == 200) {
 	$event->{'beschreibung'} = $item->{'description'};
 	$event->{'preis'} = $item->{'offers'}->{'price'}." ".$item->{'offers'}->{'priceCurrency'};
 	$event->{'vvkUrl'} = $item->{'offers'}->{'url'};
-	$event->{'veranstalter'} = $item->{'organizer'}[0]->{'name'};
+
+	if ($item->{'organizer'}[0]->{'name'}) {
+	    $event->{'veranstalter'} = $item->{'organizer'}[0]->{'name'};
+	}
+	else { $event->{'veranstalter'} = ""; }
+
 	if ($item->{'location'}[0]->{'id'}) {
 	    $event->{'ort'} = $orte{$item->{'location'}[0]->{'id'}};
 	}
