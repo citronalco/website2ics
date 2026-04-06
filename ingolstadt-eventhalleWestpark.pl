@@ -239,6 +239,8 @@ foreach my $event (@eventList) {
     }
     $description.=" \n".$event->{'description'};
 
+    $description =~ s/^\s+|\s+$//g;
+
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
 	uid=>$uid,
