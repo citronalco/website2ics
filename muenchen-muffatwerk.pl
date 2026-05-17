@@ -139,7 +139,7 @@ foreach my $eventLink ($mech->find_all_links(url_regex=>qr/\/de\/events\/view\//
     }
 
     # "Montag ab 12 Uhr geöffnet" oder: "ab 12 Uhr" (wenn "heute" oder "morgen")  -> Biergarten, usw., keine echte Verantstaltung, überspringen
-    elsif (($datum=~/^\D*ab\d+Uhr/i) or ($datum=~/^\D*ab\d+\.\d+$/i) or ($datum=~/^\D*ab\d+\.\d+\.\d+$/i) or ($datum=~/^geöffnet$/i)) {
+    elsif (($datum=~/^\D*ab\d+Uhr/i) or ($datum=~/^\D*ab\d+\.\d+$/i) or ($datum=~/^\D*ab\d+\.\d+\.\d+$/i) or ($datum=~/^geöffnet$/i) or ($datum=~/^geschlossen$/i)) {
 	next;
     }
     else {
