@@ -22,17 +22,16 @@ use Try::Tiny;
 use List::MoreUtils qw(first_index);
 
 use utf8;
-#use Data::Dumper;
+use Data::Dumper;
 use warnings;
 
 use JSON;
 
 my $htmlStripper=HTML::Strip->new();
-my @months=("januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember");
-my $url="https://backstage.eu/veranstaltungskalender";
+my $url="https://backstage.eu";
 my $defaultDauer=119;   # angenommene Dauer eines Events in Minuten (steht nicht im Programm, wird aber für Kalendereintrag gebraucht)
 
-my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%m/%d/%Y %H:%M','time_zone'=>'Europe/Berlin');
+my $datumFormat=DateTime::Format::Strptime->new('pattern'=>'%FT%T%z', 'time_zone'=>'Europe/Berlin');
 binmode STDOUT, ":utf8";	# Gegen "wide character"-Warnungen
 
 # convert datetime to DTSTART/DTEND property value
@@ -55,124 +54,56 @@ sub dt2icaldt_fullday {
 
 
 my $mech=WWW::Mechanize->new();
-$mech->get($url);
+$mech->get($url."/events");
 
-my ($var_vevent)=$mech->content()=~/var vaevents\s*=\s*(\[\s*.*\])\s*;/;
-my $vevents=decode_json($var_vevent);
+my @eventJSONs=$mech->content()=~/(\{\\"event_id\\":.*?\\"has_seating_plan\\":\w+\})/g;
 
 my @eventList;
-for my $vevent (@{$vevents}) {
+foreach my $eventJSON (@eventJSONs) {
+    $eventJSON=~s/\\"/\"/g;
+    $eventJSON=~s/\\{2}/\\/g;
+    my $eventDict=decode_json(Encode::encode("utf-8",$eventJSON));
+
     my $event;
+    next if ($eventDict->{'cancelled'});
 
-    # Wenn kein vevent->time und ein Badge ("abgesagt", "verlegt",...) -> überspringen
-    if ($vevent->{'time'} eq "" and defined($vevent->{'badge'})) {
-	next;
-    }
 
-    # URL
-    $event->{'url'}=$vevent->{'url'};
-    #print $event->{'url'}."\n";
+    $event->{'ort'} = $eventDict->{'location_name'};
+    $event->{'titel'} = $eventDict->{'title'};
+    $event->{'titel2'} = $eventDict->{'subtitle'};
+    $event->{'kategorie'} = $eventDict->{'category'};
+    #$event->{'vorverlauf_aktiv'} = $eventDict->{'presale_active'} ? 1 : 0;
+    $event->{'beginn'} = $datumFormat->parse_datetime($eventDict->{'start_time'});
+    $event->{'event_id'} = $eventDict->{'event_id'};
+    $event->{'image_url'} = $eventDict->{'main_image_path'};
 
-    # Titel
-    $event->{'titel'}=$vevent->{'name'};
-    $event->{'titel'}=~s/([\w'’]+)/\u\L$1/g;
 
-    # Genre - deaktiviert, enthält zu viel Müll
-    #$event->{'genre'}=$htmlStripper->parse($vevent->{'description'});
+    # mehr Details gibt's auf der Seite des Events
+    $event->{'url'}=$url.'/event/'.$event->{'event_id'};
 
-    # Ort
-    $event->{'ort'}=$vevent->{'venue'};
+    $mech->get($event->{'url'});
+    my ($thisEventJSON)=$mech->content()=~/{\\"data\\":(\{\\"event_id\\":.*\}),\\"descriptionHtml/;
+    $thisEventJSON=~s/\\"/\"/g;
+    $thisEventJSON=~s/\\{2}/\\/g;
+    my $thisEventDict=decode_json(Encode::encode("utf-8",$thisEventJSON));
 
-    # Beginn
-    $event->{'beginn'}=$datumFormat->parse_datetime($vevent->{'date'}." ".$vevent->{'time'});
+    $event->{'einlass'} = $datumFormat->parse_datetime($thisEventDict->{'admission_time'});
+    $event->{'headline'} = $thisEventDict->{'headline'};
+    $event->{'filter_category'} = $thisEventDict->{'filter_category'};
+    #$event->{'prices'} = $thisEventDict->{'prices'};	# Steht da was?? NEIN
+    $event->{'tickets'} = $thisEventDict->{'external_ticket_links'};
 
-    # Event-Seite laden
-    my $ok=eval { $mech->get($event->{'url'}); }; # sometimes some links are broken
-    next unless ($ok);
 
-    my $root=HTML::TreeBuilder->new_from_content($mech->content());
-
-    my $info=$root->look_down('_tag'=>'div','class'=>'product-info-main');
-    # Kategorie ("Live", "Public Viewing",...)
-
-    my $categoryLink = $event->{'kategorie'}=$info->look_down('_tag'=>'a','class'=>'ox-product-page__category-link');
-    if ($categoryLink) {
-	$event->{'kategorie'}=$categoryLink->as_trimmed_text;
-    }
-    else {
-	$event->{'kategorie'}="unbekannt";
-    }
-
-    my $innerInfo=$info->look_down('_tag'=>'div','class'=>'page-title-wrapper product');
-
-    # Untertitel
-    try {
-	my $subtitle=$innerInfo->look_down('_tag'=>'h1','class'=>'page-title')->right()->as_trimmed_text;
-        $event->{'titel'}.=" - ".$subtitle;
-    };
-
-    my $essentialInfo=$info->look_down('_tag'=>'div','class'=>'product-info-essential');
-    # Preis und Link zu Tickets
-    try {
-	my $link=$event->{'ticketUrl'}=$mech->find_link('url'=>'#bstickets');
-	$event->{'preis'}=$link->text();
-	$event->{'tickets'}=$link->url_abs()->as_string;
-    };
-
-    # Veranstalter
-    $event->{'veranstalter'}=$essentialInfo->look_down('_tag'=>'div','class'=>'product attribute eventpresenter')->look_down('_tag'=>'div','class'=>'value')->as_trimmed_text;
-
-    # Einlass - FIXME: Richtigen Tag suchen!
-    my $datumzeit;
-    my @rows=$essentialInfo->look_down('_tag'=>'strong','class'=>'type',
-	sub {
-	    $_[0]->as_text=~/^Veranstaltungsdatum/
-	})->right();
-
-    # richtige Zeile bei den Veranstaltungsdaten suchen
-    my $f=0;
-    for my $row (@rows) {
-	$datumzeit=$row->as_trimmed_text;
-	my ($day,$monthname,$year,$beginnHH,$beginnMM,$einlassHH,$einlassMM)=$datumzeit=~/\w+ (\d{1,2})\. (\w+) (\d{4})Beginn(\d{1,2})[:\.]?(\d{2}) UhrEinlass\D*(\d{1,2})[:\.]?0?(\d{2}) Uhr/;
-	my $month=1+first_index { $_ eq lc($monthname) } @months;
-	my $d = sprintf("%0.2d/%0.2d/%d",$month,$day,$year);
-	next unless ($d=~$vevent->{'date'});
-
-	# Beginn nochmal setzen, gelegentlich fehlt der in vevent. Dann muss aber das Datum stimmen!
-	unless ($event->{'beginn'}) {
-	    $event->{'beginn'}=$datumFormat->parse_datetime($month."/".$day."/".$year." ".$beginnHH.":".$beginnMM) unless($event->{'beginn'});
-	}
-
-	# Einlass
-	try {
-	    $event->{'einlass'}=$event->{'beginn'}->clone();
-	    $event->{'einlass'}->set_hour($einlassHH);
-	    $event->{'einlass'}->set_minute($einlassMM);
-	};
-	last;
-    }
+    # Wenn Einlass oder Beginn fehlt: Jeweils durch das Andere ersetzen
+    $event->{'einlass'} = $event->{'beginn'}->clone() unless ($event->{'einlass'});
+    $event->{'beginn'} = $event->{'einlass'}->clone() unless ($event->{'beginn'});
 
     # Ende
     $event->{'ende'}=$event->{'beginn'}->clone();
     $event->{'ende'}->add(minutes=>$defaultDauer);
 
-    # Beschreibung
-    try {
-	$event->{'beschreibung'}=$info->look_down('_tag'=>'div','id'=>'description')->as_trimmed_text;
-	# Ersetze Unicode-Linebreaks durch normale
-	$event->{'beschreibung'}=~s/\R/\n/g;
-	# Nichtdruckbare Zeichen (^H usw) ausfiltern
-	$event->{'beschreibung'}=~s/[^[:print:]]+//g;
-    };
-
-    unless ($event->{'beginn'}) {
-	next;
-    }
-
     push(@eventList,$event);
 }
-
-
 
 # Create Datestamp for dtstamp
 my @stamp=localtime;
@@ -227,38 +158,28 @@ foreach my $event (@eventList) {
                     $tm[1], $tm[0], scalar(Time::HiRes::gettimeofday()), $count);
 
     my $description;
-    #if ($event->{'genre'})
-    #	{ $description.="Genre: ".$event->{'genre'}." \n\n"; }
-    if ($event->{'kurzbeschreibung'})
-	{ $description.=$event->{'kurzbeschreibung'}." \n\n"; }
-    if ($event->{'preis'})
-	{ $description.=$event->{'preis'}." \n"; }
-    if ($event->{'tickets'})
-	{ $description.=$event->{'tickets'}." \n"; }
+    if ($event->{'titel2'})
+        { $description.=$event->{'titel2'}." \n\n"; }
+    if ($event->{'headline'})
+        { $description.=$event->{'headline'}." \n"; }
+    if (scalar($event->{'tickets'}) gt 0)
+        { foreach (@{$event->{'tickets'}}) { $description.=$_->{'url'}." \n"; }}
     if ($event->{'einlass'})
-	{ $description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute)." \n"; }
-
-    if ($event->{'beschreibung'})
-	{ $description.=" \n".$event->{'beschreibung'}." \n\n"; }
-
-
-    if ($event->{'veranstalter'}) {
-	$description.="Veranstalter: ".$event->{'veranstalter'};
-    }
+        { $description.="Einlass: ".sprintf("%02d:%02d Uhr",$event->{'einlass'}->hour,$event->{'einlass'}->minute)." \n"; }
 
     my $eventEntry=Data::ICal::Entry::Event->new();
     $eventEntry->add_properties(
-	uid=>$uid,
-	summary => $event->{'titel'},
-	description => $description,
-	categories => $event->{'kategorie'},
-	dtstart => dt2icaldt($event->{'beginn'}),
-	dtend => dt2icaldt($event->{'ende'}),
-	dtstamp => $dstamp,
-	class => "PUBLIC",
-	organizer => "MAILTO:foobar",
-	location => $event->{'ort'},
-	url => $event->{'url'},
+        uid=>$uid,
+        summary => $event->{'titel'},
+        description => $description,
+        categories => $event->{'kategorie'},
+        dtstart => dt2icaldt($event->{'beginn'}),
+        dtend => dt2icaldt($event->{'ende'}),
+        dtstamp => $dstamp,
+        class => "PUBLIC",
+        organizer => "MAILTO:foobar",
+        location => $event->{'ort'},
+        url => $event->{'url'},
     );
 
     $calendar->add_entry($eventEntry);
